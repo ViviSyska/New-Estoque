@@ -1,0 +1,889 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--red:#C0392B;--red2:#E74C3C;--red3:#FADBD8;--dark:#1a0a0a;--card:var(--color-background-primary);--border:var(--color-border-tertiary);--text:var(--color-text-primary);--muted:var(--color-text-secondary);--surf:var(--color-background-secondary)}
+body{font-family:var(--font-sans,sans-serif);font-size:14px;background:transparent;color:var(--text)}
+#app{max-width:430px;margin:0 auto;min-height:700px;display:flex;flex-direction:column;border:0.5px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surf)}
+.topbar{background:var(--red);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+.topbar h1{color:#fff;font-size:17px;font-weight:500;letter-spacing:.3px}
+.topbar .user-badge{background:rgba(255,255,255,0.2);color:#fff;border-radius:20px;padding:4px 10px;font-size:12px;cursor:pointer}
+.nav{display:flex;background:var(--red);border-top:1px solid rgba(255,255,255,0.15)}
+.nav button{flex:1;padding:8px 4px;background:none;border:none;color:rgba(255,255,255,0.65);font-size:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:all .2s}
+.nav button.active{color:#fff;background:rgba(255,255,255,0.15)}
+.nav button svg{width:18px;height:18px}
+.content{flex:1;overflow-y:auto;padding:12px}
+.screen{display:none}.screen.active{display:block}
+
+/* Cards */
+.card{background:var(--card);border-radius:12px;border:0.5px solid var(--border);padding:12px;margin-bottom:10px}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.card-title{font-weight:500;font-size:14px}
+.badge{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500}
+.badge-success{background:#d4edda;color:#155724}
+.badge-warning{background:#fff3cd;color:#856404}
+.badge-danger{background:#f8d7da;color:#721c24}
+.badge-info{background:#cce5ff;color:#004085}
+.badge-red{background:var(--red3);color:var(--red)}
+
+/* Metric grid */
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.metric{background:var(--card);border-radius:10px;padding:10px 12px;border:0.5px solid var(--border)}
+.metric-label{font-size:11px;color:var(--muted);margin-bottom:4px}
+.metric-value{font-size:20px;font-weight:500}
+.metric-value.red{color:var(--red)}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s}
+.btn-primary{background:var(--red);color:#fff}
+.btn-primary:hover{background:var(--red2)}
+.btn-ghost{background:none;border:0.5px solid var(--border);color:var(--text)}
+.btn-ghost:hover{background:var(--surf)}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-block{width:100%;justify-content:center}
+
+/* Form */
+.form-group{margin-bottom:10px}
+.form-group label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);background:var(--card);color:var(--text);font-size:14px;font-family:inherit}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* Status row */
+.status-row{display:flex;gap:6px;margin-top:8px}
+.status-toggle{flex:1;padding:5px;border-radius:8px;border:0.5px solid var(--border);background:var(--surf);color:var(--muted);font-size:12px;cursor:pointer;text-align:center;transition:all .2s}
+.status-toggle.active-delivered{background:#d4edda;border-color:#28a745;color:#155724;font-weight:500}
+.status-toggle.active-paid{background:#cce5ff;border-color:#0056b3;color:#004085;font-weight:500}
+
+/* Item list */
+.item-row{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:0.5px solid var(--border)}
+.item-row:last-child{border-bottom:none}
+.item-name{flex:1;font-size:13px}
+.item-qty{width:28px;text-align:center;font-size:13px;font-weight:500}
+.item-price{font-size:13px;color:var(--muted)}
+.item-total{font-size:13px;font-weight:500;min-width:60px;text-align:right}
+
+/* Tab bar inside screen */
+.tab-bar{display:flex;gap:4px;margin-bottom:12px;background:var(--surf);padding:4px;border-radius:10px}
+.tab-btn{flex:1;padding:6px;border:none;background:none;border-radius:8px;font-size:12px;cursor:pointer;color:var(--muted);transition:all .2s}
+.tab-btn.active{background:var(--card);color:var(--red);font-weight:500;border:0.5px solid var(--border)}
+
+/* Login */
+#login-screen{position:absolute;inset:0;background:var(--red);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;border-radius:16px}
+#login-screen.hidden{display:none}
+.login-logo{color:#fff;font-size:28px;font-weight:500;margin-bottom:4px}
+.login-sub{color:rgba(255,255,255,0.7);font-size:13px;margin-bottom:32px}
+.login-card{background:#fff;border-radius:14px;padding:24px;width:280px}
+.login-card h3{font-size:15px;font-weight:500;margin-bottom:16px;text-align:center;color:#1a1a1a}
+.login-card input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-size:14px;margin-bottom:10px;color:#1a1a1a}
+.login-btn{width:100%;padding:11px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;margin-top:4px}
+.users-online{display:flex;gap:4px;margin-top:16px}
+.user-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.5)}
+.user-dot.active{background:#2ecc71}
+
+/* Receipt modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;z-index:200;border-radius:16px}
+.modal-overlay.hidden{display:none}
+.modal-sheet{background:var(--card);border-radius:16px 16px 0 0;padding:20px;width:100%;max-height:85vh;overflow-y:auto}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
+.receipt-header{text-align:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px dashed var(--border)}
+.receipt-title{font-size:18px;font-weight:500;color:var(--red)}
+.share-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+.share-btn{padding:12px;border-radius:10px;border:0.5px solid var(--border);background:var(--surf);cursor:pointer;font-size:12px;font-weight:500;text-align:center;transition:all .2s;color:var(--text)}
+.share-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* Toast */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 18px;border-radius:20px;font-size:13px;z-index:300;opacity:0;pointer-events:none;transition:opacity .3s;white-space:nowrap}
+.toast.show{opacity:1}
+
+.section-title{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.divider{height:0.5px;background:var(--border);margin:10px 0}
+.total-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0}
+.total-row.big .total-val{font-size:18px;font-weight:500;color:var(--red)}
+.chip{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;background:var(--surf);border:0.5px solid var(--border);color:var(--muted)}
+
+.fab{position:fixed;bottom:70px;right:20px;width:50px;height:50px;border-radius:25px;background:var(--red);border:none;color:#fff;font-size:24px;cursor:pointer;box-shadow:0 4px 12px rgba(192,57,43,0.4);display:flex;align-items:center;justify-content:center;z-index:50}
+.progress-bar{height:4px;background:var(--surf);border-radius:2px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;background:var(--red);border-radius:2px;transition:width .3s}
+
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-icon{font-size:36px;margin-bottom:8px}
+</style>
+
+<div id="app">
+  <!-- LOGIN -->
+  <div id="login-screen">
+    <div class="login-logo">ESTOQUE PRO</div>
+    <div class="login-sub">Sistema de Gestão Completo</div>
+    <div class="login-card">
+      <h3>Entrar no sistema</h3>
+      <input id="login-name" placeholder="Seu nome" type="text">
+      <input id="login-pass" placeholder="Senha" type="password">
+      <button class="login-btn" onclick="doLogin()">Entrar</button>
+      <div style="text-align:center;margin-top:10px;font-size:11px;color:#888">Usuários online agora</div>
+      <div class="users-online" style="justify-content:center;margin-top:6px">
+        <div class="user-dot active" title="João"></div>
+        <div class="user-dot active" title="Maria"></div>
+        <div class="user-dot" title="Pedro"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <h1>ESTOQUE PRO</h1>
+    <span class="user-badge" onclick="logout()" id="user-name-badge">Visitante</span>
+  </div>
+
+  <!-- NAV -->
+  <div class="nav">
+    <button class="active" onclick="goTo('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Painel
+    </button>
+    <button onclick="goTo('pedidos',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+      Pedidos
+    </button>
+    <button onclick="goTo('estoque',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+      Estoque
+    </button>
+    <button onclick="goTo('caixa',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+      Caixa
+    </button>
+    <button onclick="goTo('clientes',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+      Clientes
+    </button>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div id="screen-dashboard" class="screen active">
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-label">Faturamento hoje</div>
+          <div class="metric-value red" id="dash-fat">R$ 0</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Pedidos abertos</div>
+          <div class="metric-value" id="dash-open">0</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Concluídos</div>
+          <div class="metric-value" id="dash-done">0</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Ticket médio</div>
+          <div class="metric-value" id="dash-ticket">R$ 0</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Mais vendidos</span><span class="badge badge-red">hoje</span></div>
+        <div id="top-products">
+          <div class="empty-state" style="padding:16px"><div class="empty-icon">📦</div><div>Nenhuma venda ainda</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Resumo do caixa</span></div>
+        <div class="total-row"><span style="color:var(--muted)">Pix</span><span id="dash-pix">R$ 0</span></div>
+        <div class="total-row"><span style="color:var(--muted)">Dinheiro</span><span id="dash-din">R$ 0</span></div>
+        <div class="total-row"><span style="color:var(--muted)">Crédito</span><span id="dash-cred">R$ 0</span></div>
+        <div class="total-row"><span style="color:var(--muted)">Débito</span><span id="dash-deb">R$ 0</span></div>
+        <div class="divider"></div>
+        <div class="total-row big"><span style="font-weight:500">Total</span><span class="total-val" id="dash-total">R$ 0</span></div>
+      </div>
+    </div>
+
+    <!-- PEDIDOS -->
+    <div id="screen-pedidos" class="screen">
+      <div id="pedidos-list"></div>
+      <div id="pedidos-empty" class="empty-state" style="display:none">
+        <div class="empty-icon">🧾</div>
+        <div>Nenhum pedido aberto</div>
+        <div style="margin-top:8px;font-size:12px">Toque no + para criar</div>
+      </div>
+    </div>
+
+    <!-- ESTOQUE -->
+    <div id="screen-estoque" class="screen">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="eTab('list',this)">Produtos</button>
+        <button class="tab-btn" onclick="eTab('add',this)">Adicionar</button>
+        <button class="tab-btn" onclick="eTab('alertas',this)">Alertas</button>
+      </div>
+      <div id="estoque-list">
+        <div id="prod-list"></div>
+      </div>
+      <div id="estoque-add" style="display:none">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:12px">Novo produto</div>
+          <div class="form-group"><label>Nome do produto</label><input id="p-nome" placeholder="Ex: Refrigerante 2L"></div>
+          <div class="form-row">
+            <div class="form-group"><label>Qtd em estoque</label><input id="p-qtd" type="number" placeholder="0" min="0"></div>
+            <div class="form-group"><label>Qtd mínima (alerta)</label><input id="p-min" type="number" placeholder="5" min="0"></div>
+          </div>
+          <div class="form-group"><label>Preço de venda (R$)</label><input id="p-preco" type="number" placeholder="0.00" step="0.01" min="0"></div>
+          <div class="section-title" style="margin-top:4px">Custo</div>
+          <div class="tab-bar" style="margin-bottom:8px">
+            <button class="tab-btn active" id="custo-tab1" onclick="custoMode(1)">Unitário direto</button>
+            <button class="tab-btn" id="custo-tab2" onclick="custoMode(2)">Por lote</button>
+          </div>
+          <div id="custo-mode1">
+            <div class="form-group"><label>Custo unitário (R$)</label><input id="p-custo" type="number" placeholder="0.00" step="0.01" min="0"></div>
+          </div>
+          <div id="custo-mode2" style="display:none">
+            <div class="form-row">
+              <div class="form-group"><label>Valor total gasto (R$)</label><input id="p-lote-total" type="number" placeholder="0.00" step="0.01" oninput="calcCusto()"></div>
+              <div class="form-group"><label>Quantidade do lote</label><input id="p-lote-qtd" type="number" placeholder="0" oninput="calcCusto()"></div>
+            </div>
+            <div class="form-group"><label>Custo unitário calculado</label><input id="p-custo-calc" readonly placeholder="—" style="background:var(--surf);color:var(--red);font-weight:500"></div>
+          </div>
+          <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="addProduto()">Salvar produto</button>
+        </div>
+      </div>
+      <div id="estoque-alertas" style="display:none">
+        <div id="alertas-list"></div>
+      </div>
+    </div>
+
+    <!-- CAIXA -->
+    <div id="screen-caixa" class="screen">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="cxTab('resumo',this)">Resumo</button>
+        <button class="tab-btn" onclick="cxTab('entradas',this)">Entradas</button>
+        <button class="tab-btn" onclick="cxTab('relat',this)">Relatórios</button>
+      </div>
+      <div id="caixa-resumo">
+        <div class="metrics">
+          <div class="metric"><div class="metric-label">Total do dia</div><div class="metric-value red" id="cx-dia">R$ 0</div></div>
+          <div class="metric"><div class="metric-label">Pedidos pagos</div><div class="metric-value" id="cx-qtd">0</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:10px">Por forma de pagamento</div>
+          <div class="total-row"><span>Pix</span><span id="cx-pix2">R$ 0</span></div>
+          <div class="total-row"><span>Dinheiro</span><span id="cx-din2">R$ 0</span></div>
+          <div class="total-row"><span>Crédito</span><span id="cx-cred2">R$ 0</span></div>
+          <div class="total-row"><span>Débito</span><span id="cx-deb2">R$ 0</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:10px">Por tipo de venda</div>
+          <div class="total-row"><span>Home</span><span id="cx-home">R$ 0</span></div>
+          <div class="total-row"><span>Entrega</span><span id="cx-entrega">R$ 0</span></div>
+        </div>
+      </div>
+      <div id="caixa-entradas" style="display:none">
+        <div id="cx-list"></div>
+        <div id="cx-empty" class="empty-state"><div class="empty-icon">💳</div><div>Nenhuma entrada ainda</div></div>
+      </div>
+      <div id="caixa-relat" style="display:none">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:10px">Filtrar relatório</div>
+          <div class="form-group"><label>Período</label>
+            <select id="relat-period">
+              <option>Hoje</option><option>Esta semana</option><option>Este mês</option><option>Este ano</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Tipo de venda</label>
+            <select id="relat-tipo"><option>Todos</option><option>Home</option><option>Entrega</option></select>
+          </div>
+          <div class="form-group"><label>Forma de pagamento</label>
+            <select id="relat-pgto"><option>Todos</option><option>Pix</option><option>Dinheiro</option><option>Crédito</option><option>Débito</option></select>
+          </div>
+          <button class="btn btn-primary btn-block" onclick="gerarRelat()">Gerar relatório</button>
+        </div>
+        <div id="relat-result" style="display:none" class="card">
+          <div class="card-title" style="margin-bottom:10px">Resultado</div>
+          <div id="relat-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENTES -->
+    <div id="screen-clientes" class="screen">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="clTab('hist',this)">Histórico</button>
+        <button class="tab-btn" onclick="clTab('cadastro',this)">Cadastrar</button>
+      </div>
+      <div id="clientes-hist">
+        <div id="hist-list"></div>
+        <div id="hist-empty" class="empty-state"><div class="empty-icon">👤</div><div>Nenhum histórico ainda</div></div>
+      </div>
+      <div id="clientes-cadastro" style="display:none">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:12px">Novo cliente</div>
+          <div class="form-group"><label>Nome</label><input id="cl-nome" placeholder="Nome completo"></div>
+          <div class="form-group"><label>WhatsApp</label><input id="cl-tel" placeholder="(11) 99999-9999" type="tel"></div>
+          <div class="form-group"><label>Endereço</label><input id="cl-end" placeholder="Rua, número, bairro"></div>
+          <button class="btn btn-primary btn-block" onclick="addCliente()">Salvar cliente</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end content -->
+
+  <!-- FAB -->
+  <button class="fab" id="fab-btn" onclick="openNewPedido()">+</button>
+</div><!-- end app -->
+
+<!-- MODAL: NOVO PEDIDO -->
+<div class="modal-overlay hidden" id="modal-pedido">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:500" id="modal-pedido-title">Nova comanda</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-pedido')">Fechar</button>
+    </div>
+    <div class="form-group"><label>Cliente</label>
+      <select id="ped-cliente"><option value="">Selecionar cliente</option></select>
+    </div>
+    <div class="form-group"><label>Tipo de venda *</label>
+      <select id="ped-tipo"><option value="Home">Home</option><option value="Entrega">Entrega</option></select>
+    </div>
+    <div class="form-group"><label>Observações</label>
+      <textarea id="ped-obs" rows="2" placeholder="Ex: sem cebola, apartamento 42..." style="resize:none;font-family:inherit;font-size:14px;width:100%;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);background:var(--card);color:var(--text)"></textarea>
+    </div>
+
+    <div class="section-title">Itens da comanda</div>
+    <div id="ped-items-list" style="margin-bottom:10px"></div>
+
+    <div class="card" style="background:var(--surf)">
+      <div class="form-row">
+        <div class="form-group"><label>Produto</label>
+          <select id="ped-prod"><option value="">Selecionar</option></select>
+        </div>
+        <div class="form-group"><label>Qtd</label>
+          <input id="ped-qtd" type="number" value="1" min="1">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Desconto %</label>
+          <input id="ped-desc-pct" type="number" placeholder="0" min="0" max="100">
+        </div>
+        <div class="form-group"><label>Desconto R$</label>
+          <input id="ped-desc-val" type="number" placeholder="0" min="0" step="0.01">
+        </div>
+      </div>
+      <div class="form-group"><label>Cupom</label>
+        <input id="ped-cupom" placeholder="Código do cupom (opcional)">
+      </div>
+      <button class="btn btn-ghost btn-block btn-sm" onclick="addItemPedido()">+ Adicionar item</button>
+    </div>
+
+    <div class="divider"></div>
+    <div class="total-row big"><span>Total da comanda</span><span class="total-val" id="ped-total-display">R$ 0,00</span></div>
+    <button class="btn btn-primary btn-block" style="margin-top:10px" onclick="salvarPedido()" id="btn-salvar-pedido">Criar comanda</button>
+  </div>
+</div>
+
+<!-- MODAL: RECIBO -->
+<div class="modal-overlay hidden" id="modal-recibo">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="receipt-header">
+      <div class="receipt-title">ESTOQUE PRO</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px" id="recibo-data"></div>
+    </div>
+    <div id="recibo-body"></div>
+    <div class="divider"></div>
+    <div class="total-row big"><span>Total pago</span><span class="total-val" id="recibo-total"></span></div>
+    <div style="margin-top:6px;font-size:12px;color:var(--muted);text-align:center" id="recibo-pgto"></div>
+    <div class="section-title" style="margin-top:16px">Compartilhar via</div>
+    <div class="share-grid">
+      <button class="share-btn" onclick="shareRecibo('whatsapp')">WhatsApp</button>
+      <button class="share-btn" onclick="shareRecibo('copiar')">Copiar texto</button>
+      <button class="share-btn" onclick="shareRecibo('imprimir')">Imprimir</button>
+      <button class="share-btn" onclick="closeModal('modal-recibo')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DETALHE PEDIDO HISTORICO -->
+<div class="modal-overlay hidden" id="modal-hist-detail">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:500">Comanda — histórico</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-hist-detail')">Fechar</button>
+    </div>
+    <div id="hist-detail-body"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+      <button class="btn btn-ghost btn-block btn-sm" onclick="reabrirComanda()">Reabrir comanda</button>
+      <button class="btn btn-primary btn-block btn-sm" onclick="emitirRecibo()">Emitir recibo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PAGAMENTO -->
+<div class="modal-overlay hidden" id="modal-pagamento">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div style="font-size:15px;font-weight:500;margin-bottom:16px">Registrar pagamento</div>
+    <div class="form-group"><label>Forma de pagamento</label>
+      <select id="pgto-forma">
+        <option value="Pix">Pix</option>
+        <option value="Dinheiro">Dinheiro</option>
+        <option value="Crédito">Crédito</option>
+        <option value="Débito">Débito</option>
+      </select>
+    </div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Total: <strong id="pgto-valor-label">R$ 0,00</strong></div>
+    <button class="btn btn-primary btn-block" onclick="confirmarPagamento()">Confirmar pagamento</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var state={
+  user:null,
+  pedidos:[],
+  produtos:[{id:1,nome:'Produto A',preco:15,custo:8,qtd:20,min:5},{id:2,nome:'Produto B',preco:22,custo:12,qtd:8,min:10},{id:3,nome:'Produto C',preco:9.5,custo:4,qtd:3,min:5}],
+  clientes:[{id:1,nome:'Maria Silva',tel:'11999999999',end:'Rua das Flores, 10'},{id:2,nome:'João Souza',tel:'11988888888',end:'Av. Brasil, 55'}],
+  historico:[],
+  caixa:[],
+  nextId:100,
+  editingId:null,
+  currentHistComanda:null
+};
+
+function fmt(v){return'R$ '+parseFloat(v||0).toFixed(2).replace('.',',')}
+function fmtS(v){return'R$ '+parseFloat(v||0).toFixed(2).replace('.',',')}
+
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+
+function doLogin(){
+  var n=document.getElementById('login-name').value.trim();
+  var p=document.getElementById('login-pass').value.trim();
+  if(!n){toast('Digite seu nome');return}
+  if(!p){toast('Digite a senha');return}
+  state.user=n;
+  document.getElementById('user-name-badge').textContent=n;
+  document.getElementById('login-screen').classList.add('hidden');
+  renderAll();
+  toast('Bem-vindo, '+n+'!')
+}
+function logout(){if(confirm('Sair do sistema?')){document.getElementById('login-screen').classList.remove('hidden');state.user=null}}
+
+function goTo(s,el){
+  document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
+  document.getElementById('screen-'+s).classList.add('active');
+  el.classList.add('active');
+  var fab=document.getElementById('fab-btn');
+  fab.style.display=s==='pedidos'?'flex':'none';
+  renderAll();
+}
+
+function renderAll(){renderPedidos();renderEstoque();renderCaixa();renderClientes();renderDash()}
+
+function renderDash(){
+  var pagos=state.historico;
+  var fat=pagos.reduce((a,p)=>a+p.total,0);
+  var abertos=state.pedidos.length;
+  var conc=pagos.length;
+  var ticket=conc>0?fat/conc:0;
+  document.getElementById('dash-fat').textContent=fmt(fat);
+  document.getElementById('dash-open').textContent=abertos;
+  document.getElementById('dash-done').textContent=conc;
+  document.getElementById('dash-ticket').textContent=fmt(ticket);
+
+  var byPgto={Pix:0,Dinheiro:0,'Crédito':0,'Débito':0};
+  pagos.forEach(p=>{if(byPgto[p.pgto]!==undefined)byPgto[p.pgto]+=p.total});
+  document.getElementById('dash-pix').textContent=fmt(byPgto.Pix);
+  document.getElementById('dash-din').textContent=fmt(byPgto.Dinheiro);
+  document.getElementById('dash-cred').textContent=fmt(byPgto['Crédito']);
+  document.getElementById('dash-deb').textContent=fmt(byPgto['Débito']);
+  document.getElementById('dash-total').textContent=fmt(fat);
+
+  var vendas={};
+  pagos.forEach(p=>(p.itens||[]).forEach(it=>{vendas[it.nome]=(vendas[it.nome]||0)+it.qtd}));
+  var sorted=Object.entries(vendas).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  var tp=document.getElementById('top-products');
+  if(!sorted.length){tp.innerHTML='<div class="empty-state" style="padding:12px"><div class="empty-icon">📦</div><div>Nenhuma venda ainda</div></div>';return}
+  tp.innerHTML=sorted.map(([n,q],i)=>`<div class="total-row"><span style="color:var(--muted)">${i+1}. ${n}</span><span class="badge badge-red">${q} un</span></div>`).join('')
+}
+
+function renderPedidos(){
+  var list=document.getElementById('pedidos-list');
+  var empty=document.getElementById('pedidos-empty');
+  if(!state.pedidos.length){list.innerHTML='';empty.style.display='block';return}
+  empty.style.display='none';
+  list.innerHTML=state.pedidos.map(p=>{
+    var cl=state.clientes.find(c=>c.id==p.clienteId);
+    var clNome=cl?cl.nome:'Sem cliente';
+    return`<div class="card" id="ped-${p.id}">
+      <div class="card-header">
+        <div>
+          <div class="card-title">#${p.id} — ${clNome}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${p.tipo||'Home'} ${p.obs?'· '+p.obs:''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:15px;font-weight:500;color:var(--red)">${fmt(p.total)}</div>
+          <div style="font-size:11px;color:var(--muted)">${p.itens.length} iten(s)</div>
+        </div>
+      </div>
+      <div class="item-row" style="flex-wrap:wrap;gap:4px;border:none;padding-top:0">
+        ${p.itens.slice(0,3).map(it=>`<span class="chip">${it.qtd}x ${it.nome}</span>`).join('')}
+        ${p.itens.length>3?`<span class="chip">+${p.itens.length-3}</span>`:''}
+      </div>
+      <div class="status-row">
+        <button class="status-toggle ${p.entregue?'active-delivered':''}" onclick="toggleStatus(${p.id},'entregue')">
+          ${p.entregue?'✓ Entregue':'Marcar entregue'}
+        </button>
+        <button class="status-toggle ${p.pago?'active-paid':''}" onclick="${p.pago?'':'abrirPagamento('+p.id+')'}">
+          ${p.pago?'✓ Pago':'Registrar pagto'}
+        </button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn btn-ghost btn-sm" onclick="editarPedido(${p.id})">Editar</button>
+        <button class="btn btn-ghost btn-sm" onclick="emitirReciboPedido(${p.id})">Recibo</button>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function renderEstoque(){
+  var pl=document.getElementById('prod-list');
+  if(!pl)return;
+  pl.innerHTML=state.produtos.map(p=>{
+    var lucro=p.preco-p.custo;
+    var pct=p.min>0?Math.min(100,Math.round(p.qtd/p.min*100)):100;
+    var low=p.qtd<=p.min;
+    return`<div class="card">
+      <div class="card-header">
+        <div><div class="card-title">${p.nome}</div><div style="font-size:12px;color:var(--muted)">Custo: ${fmt(p.custo)} · Lucro: ${fmt(lucro)}</div></div>
+        <div style="text-align:right"><div style="font-size:16px;font-weight:500">${fmt(p.preco)}</div><span class="badge ${low?'badge-danger':'badge-success'}">${p.qtd} un</span></div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${low?'#E74C3C':'var(--red)'}"></div></div>
+    </div>`
+  }).join('');
+  var al=document.getElementById('alertas-list');
+  if(al){
+    var baixo=state.produtos.filter(p=>p.qtd<=p.min);
+    al.innerHTML=baixo.length?baixo.map(p=>`<div class="card"><div class="card-header"><span class="card-title">${p.nome}</span><span class="badge badge-danger">Estoque baixo</span></div><div style="font-size:13px;color:var(--muted)">Restam ${p.qtd} unidades (mínimo: ${p.min})</div></div>`).join(''):
+    `<div class="empty-state"><div class="empty-icon">✅</div><div>Nenhum alerta de estoque</div></div>`
+  }
+}
+
+function renderCaixa(){
+  var pagos=state.historico;
+  var fat=pagos.reduce((a,p)=>a+p.total,0);
+  var byPgto={Pix:0,Dinheiro:0,'Crédito':0,'Débito':0};
+  var byTipo={Home:0,Entrega:0};
+  pagos.forEach(p=>{
+    if(byPgto[p.pgto]!==undefined)byPgto[p.pgto]+=p.total;
+    if(byTipo[p.tipo]!==undefined)byTipo[p.tipo]+=p.total;
+  });
+  document.getElementById('cx-dia').textContent=fmt(fat);
+  document.getElementById('cx-qtd').textContent=pagos.length;
+  document.getElementById('cx-pix2').textContent=fmt(byPgto.Pix);
+  document.getElementById('cx-din2').textContent=fmt(byPgto.Dinheiro);
+  document.getElementById('cx-cred2').textContent=fmt(byPgto['Crédito']);
+  document.getElementById('cx-deb2').textContent=fmt(byPgto['Débito']);
+  document.getElementById('cx-home').textContent=fmt(byTipo.Home);
+  document.getElementById('cx-entrega').textContent=fmt(byTipo.Entrega);
+
+  var cl=document.getElementById('cx-list');
+  var ce=document.getElementById('cx-empty');
+  if(!pagos.length){if(cl)cl.innerHTML='';if(ce)ce.style.display='block';return}
+  if(ce)ce.style.display='none';
+  if(cl)cl.innerHTML=pagos.map(p=>`<div class="card"><div class="card-header"><div><div class="card-title">#${p.id}</div><div style="font-size:12px;color:var(--muted)">${p.tipo} · ${p.pgto}</div></div><div style="font-size:16px;font-weight:500;color:var(--red)">${fmt(p.total)}</div></div></div>`).join('')
+}
+
+function renderClientes(){
+  var sl=document.getElementById('ped-cliente');
+  if(sl){sl.innerHTML='<option value="">Selecionar cliente</option>'+state.clientes.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}
+  var hist=document.getElementById('hist-list');
+  var hempty=document.getElementById('hist-empty');
+  if(!state.historico.length){if(hist)hist.innerHTML='';if(hempty)hempty.style.display='block';return}
+  if(hempty)hempty.style.display='none';
+  if(hist){
+    var byCl={};
+    state.historico.forEach(p=>{if(!byCl[p.clienteId])byCl[p.clienteId]=[];byCl[p.clienteId].push(p)});
+    hist.innerHTML=state.clientes.filter(c=>byCl[c.id]).map(c=>{
+      var orders=byCl[c.id];
+      var total=orders.reduce((a,o)=>a+o.total,0);
+      return`<div class="card"><div class="card-header"><div><div class="card-title">${c.nome}</div><div style="font-size:12px;color:var(--muted)">${orders.length} pedido(s) · gasto total: ${fmt(total)}</div></div><span class="badge badge-success">ativo</span></div>
+      <div style="margin-top:8px">${orders.map(o=>`<div class="total-row" style="cursor:pointer" onclick="showHistDetail(${o.id})"><span style="font-size:13px">#${o.id} — ${o.tipo}</span><span style="font-size:13px;font-weight:500">${fmt(o.total)}</span></div>`).join('')}</div></div>`
+    }).join('')
+  }
+}
+
+function openNewPedido(){
+  state.editingId=null;
+  document.getElementById('modal-pedido-title').textContent='Nova comanda';
+  document.getElementById('btn-salvar-pedido').textContent='Criar comanda';
+  document.getElementById('ped-obs').value='';
+  document.getElementById('ped-tipo').value='Home';
+  document.getElementById('ped-cupom').value='';
+  window._pedItems=[];
+  renderPedItems();
+  populateProdutos();
+  document.getElementById('modal-pedido').classList.remove('hidden');
+}
+
+function editarPedido(id){
+  var p=state.pedidos.find(x=>x.id==id);
+  if(!p)return;
+  state.editingId=id;
+  document.getElementById('modal-pedido-title').textContent='Editar comanda #'+id;
+  document.getElementById('btn-salvar-pedido').textContent='Salvar alterações';
+  document.getElementById('ped-cliente').value=p.clienteId||'';
+  document.getElementById('ped-tipo').value=p.tipo||'Home';
+  document.getElementById('ped-obs').value=p.obs||'';
+  window._pedItems=JSON.parse(JSON.stringify(p.itens));
+  renderPedItems();
+  populateProdutos();
+  document.getElementById('modal-pedido').classList.remove('hidden');
+}
+
+function populateProdutos(){
+  var s=document.getElementById('ped-prod');
+  s.innerHTML='<option value="">Selecionar produto</option>'+state.produtos.map(p=>`<option value="${p.id}">${p.nome} — ${fmt(p.preco)}</option>`).join('')
+}
+
+function addItemPedido(){
+  var pid=document.getElementById('ped-prod').value;
+  var qtd=parseInt(document.getElementById('ped-qtd').value)||1;
+  var dpct=parseFloat(document.getElementById('ped-desc-pct').value)||0;
+  var dval=parseFloat(document.getElementById('ped-desc-val').value)||0;
+  var cup=document.getElementById('ped-cupom').value.trim();
+  if(!pid){toast('Selecione um produto');return}
+  var prod=state.produtos.find(p=>p.id==parseInt(pid));
+  if(!prod){return}
+  var precoUnit=prod.preco;
+  var descUnit=dval+(precoUnit*dpct/100);
+  var precoFinal=Math.max(0,precoUnit-descUnit);
+  if(!window._pedItems)window._pedItems=[];
+  window._pedItems.push({prodId:prod.id,nome:prod.nome,qtd,precoUnit,descPct:dpct,descVal:dval,cupom:cup,precoFinal,total:precoFinal*qtd});
+  document.getElementById('ped-desc-pct').value='';
+  document.getElementById('ped-desc-val').value='';
+  document.getElementById('ped-cupom').value='';
+  document.getElementById('ped-qtd').value=1;
+  renderPedItems();
+}
+
+function renderPedItems(){
+  if(!window._pedItems)window._pedItems=[];
+  var total=window._pedItems.reduce((a,i)=>a+i.total,0);
+  document.getElementById('ped-total-display').textContent=fmt(total);
+  var list=document.getElementById('ped-items-list');
+  if(!window._pedItems.length){list.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0">Nenhum item adicionado</div>';return}
+  list.innerHTML=window._pedItems.map((it,idx)=>`<div class="item-row">
+    <div class="item-name">${it.nome}${it.cupom?'<span class="chip" style="margin-left:4px">'+it.cupom+'</span>':''}</div>
+    <div class="item-qty">${it.qtd}x</div>
+    <div class="item-price">${fmt(it.precoFinal)}</div>
+    <div class="item-total">${fmt(it.total)}</div>
+    <button onclick="removeItem(${idx})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px">×</button>
+  </div>`).join('')
+}
+
+function removeItem(idx){window._pedItems.splice(idx,1);renderPedItems()}
+
+function salvarPedido(){
+  if(!window._pedItems||!window._pedItems.length){toast('Adicione pelo menos um item');return}
+  var cl=document.getElementById('ped-cliente').value;
+  var tipo=document.getElementById('ped-tipo').value;
+  var obs=document.getElementById('ped-obs').value.trim();
+  var total=window._pedItems.reduce((a,i)=>a+i.total,0);
+  if(state.editingId){
+    var p=state.pedidos.find(x=>x.id==state.editingId);
+    if(p){p.clienteId=cl?parseInt(cl):null;p.tipo=tipo;p.obs=obs;p.itens=window._pedItems;p.total=total}
+    toast('Comanda atualizada!')
+  } else {
+    state.pedidos.push({id:state.nextId++,clienteId:cl?parseInt(cl):null,tipo,obs,itens:window._pedItems,total,entregue:false,pago:false});
+    toast('Comanda criada!')
+  }
+  closeModal('modal-pedido');
+  renderAll();
+}
+
+function toggleStatus(id,field){
+  var p=state.pedidos.find(x=>x.id==id);
+  if(!p)return;
+  if(field==='entregue'){p.entregue=!p.entregue;toast(p.entregue?'Marcado como entregue':'Desmarcado')}
+  if(p.entregue&&p.pago)moveToHistory(p);
+  else renderPedidos();
+}
+
+function abrirPagamento(id){
+  var p=state.pedidos.find(x=>x.id==id);
+  if(!p)return;
+  window._pagandoId=id;
+  document.getElementById('pgto-valor-label').textContent=fmt(p.total);
+  document.getElementById('modal-pagamento').classList.remove('hidden');
+}
+
+function confirmarPagamento(){
+  var id=window._pagandoId;
+  var p=state.pedidos.find(x=>x.id==id);
+  if(!p)return;
+  p.pago=true;
+  p.pgto=document.getElementById('pgto-forma').value;
+  toast('Pagamento registrado!');
+  closeModal('modal-pagamento');
+  if(p.entregue&&p.pago)moveToHistory(p);
+  else renderPedidos();
+}
+
+function moveToHistory(p){
+  state.historico.push({...p});
+  state.pedidos=state.pedidos.filter(x=>x.id!==p.id);
+  // baixa estoque
+  p.itens.forEach(it=>{
+    var prod=state.produtos.find(pr=>pr.id==it.prodId);
+    if(prod)prod.qtd=Math.max(0,prod.qtd-it.qtd);
+  });
+  toast('Pedido concluído e movido ao histórico!');
+  renderAll();
+}
+
+function showHistDetail(id){
+  var p=state.historico.find(x=>x.id==id);
+  if(!p)return;
+  state.currentHistComanda=p;
+  var cl=state.clientes.find(c=>c.id==p.clienteId);
+  var body=document.getElementById('hist-detail-body');
+  body.innerHTML=`<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Cliente: ${cl?cl.nome:'N/A'} · ${p.tipo} · ${p.pgto}</div>
+  ${p.itens.map(it=>`<div class="item-row"><div class="item-name">${it.nome}</div><div class="item-qty">${it.qtd}x</div><div class="item-total">${fmt(it.total)}</div></div>`).join('')}
+  <div class="total-row big" style="margin-top:8px"><span>Total</span><span class="total-val">${fmt(p.total)}</span></div>`
+  document.getElementById('modal-hist-detail').classList.remove('hidden');
+}
+
+function reabrirComanda(){
+  var p=state.currentHistComanda;
+  if(!p)return;
+  p.pago=false;p.entregue=false;
+  state.historico=state.historico.filter(x=>x.id!==p.id);
+  state.pedidos.push(p);
+  closeModal('modal-hist-detail');
+  toast('Comanda reaberta!');
+  renderAll();
+}
+
+function emitirRecibo(){
+  var p=state.currentHistComanda;
+  if(p)abrirRecibo(p);
+}
+
+function emitirReciboPedido(id){
+  var p=state.pedidos.find(x=>x.id==id)||state.historico.find(x=>x.id==id);
+  if(p)abrirRecibo(p);
+}
+
+function abrirRecibo(p){
+  var cl=state.clientes.find(c=>c.id==p.clienteId);
+  document.getElementById('recibo-data').textContent=new Date().toLocaleString('pt-BR');
+  document.getElementById('recibo-total').textContent=fmt(p.total);
+  document.getElementById('recibo-pgto').textContent=(p.pgto?'Pago via '+p.pgto:'')+(p.tipo?' · '+p.tipo:'');
+  var body=document.getElementById('recibo-body');
+  body.innerHTML=`<div style="font-size:13px;margin-bottom:10px"><strong>Cliente:</strong> ${cl?cl.nome:'N/A'}</div>
+  ${p.itens.map(it=>`<div class="item-row"><div class="item-name">${it.nome}</div><div class="item-qty">${it.qtd}x</div><div class="item-total">${fmt(it.total)}</div></div>`).join('')}`
+  window._reciboData=p;
+  closeModal('modal-hist-detail');
+  document.getElementById('modal-recibo').classList.remove('hidden');
+}
+
+function shareRecibo(via){
+  var p=window._reciboData;
+  if(!p)return;
+  var cl=state.clientes.find(c=>c.id==p.clienteId);
+  var txt='*ESTOQUE PRO — RECIBO*\n'+'Cliente: '+(cl?cl.nome:'N/A')+'\n'+'Tipo: '+p.tipo+'\n\n'+p.itens.map(it=>it.qtd+'x '+it.nome+' — '+fmt(it.total)).join('\n')+'\n\n*Total: '+fmt(p.total)+'*'+(p.pgto?'\nPago via '+p.pgto:'');
+  if(via==='whatsapp'){var url='https://wa.me/?text='+encodeURIComponent(txt);window.open(url,'_blank')}
+  else if(via==='copiar'){navigator.clipboard&&navigator.clipboard.writeText(txt);toast('Texto copiado!')}
+  else if(via==='imprimir'){window.print()}
+}
+
+function closeModal(id){document.getElementById(id).classList.add('hidden')}
+
+function addProduto(){
+  var nome=document.getElementById('p-nome').value.trim();
+  var qtd=parseInt(document.getElementById('p-qtd').value)||0;
+  var min=parseInt(document.getElementById('p-min').value)||0;
+  var preco=parseFloat(document.getElementById('p-preco').value)||0;
+  var custo=parseFloat(document.getElementById('p-custo-calc').value||document.getElementById('p-custo').value)||0;
+  if(!nome){toast('Informe o nome do produto');return}
+  if(!preco){toast('Informe o preço de venda');return}
+  state.produtos.push({id:state.nextId++,nome,preco,custo,qtd,min});
+  document.getElementById('p-nome').value='';document.getElementById('p-qtd').value='';
+  document.getElementById('p-preco').value='';document.getElementById('p-custo').value='';
+  document.getElementById('p-custo-calc').value='';
+  toast('Produto adicionado!');
+  eTab('list',document.querySelector('#estoque-add').previousElementSibling);
+  renderEstoque();
+}
+
+function calcCusto(){
+  var t=parseFloat(document.getElementById('p-lote-total').value)||0;
+  var q=parseFloat(document.getElementById('p-lote-qtd').value)||0;
+  document.getElementById('p-custo-calc').value=q>0?(t/q).toFixed(2):'';
+}
+
+function addCliente(){
+  var nome=document.getElementById('cl-nome').value.trim();
+  var tel=document.getElementById('cl-tel').value.trim();
+  var end=document.getElementById('cl-end').value.trim();
+  if(!nome){toast('Informe o nome');return}
+  state.clientes.push({id:state.nextId++,nome,tel,end});
+  document.getElementById('cl-nome').value='';document.getElementById('cl-tel').value='';document.getElementById('cl-end').value='';
+  toast('Cliente cadastrado!');renderAll();
+}
+
+function eTab(tab,el){
+  ['list','add','alertas'].forEach(t=>{document.getElementById('estoque-'+t).style.display='none'});
+  document.getElementById('estoque-'+tab).style.display='block';
+  document.querySelectorAll('#screen-estoque .tab-btn').forEach(b=>b.classList.remove('active'));
+  if(el)el.classList.add('active');
+  renderEstoque();
+}
+
+function cxTab(tab,el){
+  ['resumo','entradas','relat'].forEach(t=>{document.getElementById('caixa-'+t).style.display='none'});
+  document.getElementById('caixa-'+tab).style.display='block';
+  document.querySelectorAll('#screen-caixa .tab-btn').forEach(b=>b.classList.remove('active'));
+  if(el)el.classList.add('active');
+}
+
+function clTab(tab,el){
+  ['hist','cadastro'].forEach(t=>{document.getElementById('clientes-'+t).style.display='none'});
+  document.getElementById('clientes-'+tab).style.display='block';
+  document.querySelectorAll('#screen-clientes .tab-btn').forEach(b=>b.classList.remove('active'));
+  if(el)el.classList.add('active');
+}
+
+function custoMode(m){
+  document.getElementById('custo-mode1').style.display=m===1?'block':'none';
+  document.getElementById('custo-mode2').style.display=m===2?'block':'none';
+  document.getElementById('custo-tab1').classList.toggle('active',m===1);
+  document.getElementById('custo-tab2').classList.toggle('active',m===2);
+}
+
+function gerarRelat(){
+  var period=document.getElementById('relat-period').value;
+  var tipo=document.getElementById('relat-tipo').value;
+  var pgto=document.getElementById('relat-pgto').value;
+  var dados=state.historico.filter(p=>{
+    if(tipo!=='Todos'&&p.tipo!==tipo)return false;
+    if(pgto!=='Todos'&&p.pgto!==pgto)return false;
+    return true;
+  });
+  var total=dados.reduce((a,p)=>a+p.total,0);
+  var rc=document.getElementById('relat-content');
+  rc.innerHTML=`<div class="total-row"><span>Período</span><span>${period}</span></div>
+  <div class="total-row"><span>Pedidos</span><span>${dados.length}</span></div>
+  <div class="total-row"><span>Ticket médio</span><span>${fmt(dados.length?total/dados.length:0)}</span></div>
+  <div class="divider"></div>
+  <div class="total-row big"><span>Total</span><span class="total-val">${fmt(total)}</span></div>`;
+  document.getElementById('relat-result').style.display='block';
+  toast('Relatório gerado!');
+}
+
+// Hide FAB initially (only on pedidos)
+document.getElementById('fab-btn').style.display='none';
+renderAll();
+</script>
