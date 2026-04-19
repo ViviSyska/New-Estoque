@@ -950,18 +950,22 @@ async function doLogin(){
   var authId=res.user&&res.user.id;
   if(!authId){showErr('lerr','Erro de autenticação. Tente novamente.');return}
   try{
+    // buscar pelo ID do Auth primeiro
     var userData=await sbFetch('usuarios?id=eq.'+authId+'&select=*');
+    // se não achar pelo ID, buscar pelo email/username
     if(!userData||!userData.length){
       userData=await sbFetch('usuarios?username=eq.'+encodeURIComponent(email)+'&select=*');
     }
     if(!userData||!userData.length){showErr('lerr','Usuário não encontrado. Contate o administrador.');return}
     me=userData[0];
+    // buscar empresa
     var empData=await sbFetch('empresas?id=eq.'+me.empresa_id+'&select=*');
     empresa=empData&&empData[0]||null;
     if(!empresa){showErr('lerr','Empresa não encontrada. Contate o administrador.');return}
     LS.s('session',{me,empresa,token:res.access_token});
     afterLogin();
   }catch(e){showErr('lerr','Erro ao carregar dados. Verifique sua conexão.')}
+}
 
 async function doRegister(){
   var nome=document.getElementById('rn').value.trim();
