@@ -293,7 +293,7 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
     </div>
     <div id="lf-entrar" class="lform active">
       <div class="lerr" id="lerr"></div>
-      <div class="fg"><label>Usuário ou email</label><input id="li-email" placeholder="Usuário ou email" autocomplete="username" autocapitalize="none"></div>
+      <div class="fg"><label>Email</label><input id="li-email" type="email" placeholder="seu@email.com" autocomplete="email" inputmode="email"></div>
       <div class="fg"><label>Senha</label><input id="li-pass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
       <button class="lbtn" onclick="doLogin()">Entrar no sistema</button>
       <div class="forgot-link"><span onclick="doForgotPass()">Esqueceu sua senha?</span></div>
@@ -1011,32 +1011,14 @@ function ltab(tab,el){
 function showErr(id,msg){var e=document.getElementById(id);e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),4000)}
 
 async function doLogin(){
-  // verificar bloqueio por tentativas
   if(Date.now()<_loginBloqueadoAte){
     var mins=Math.ceil((_loginBloqueadoAte-Date.now())/60000);
     showErr('lerr','Muitas tentativas. Aguarde '+mins+' minuto(s).');return;
   }
-  var input=document.getElementById('li-email').value.trim();
+  var email=document.getElementById('li-email').value.trim();
   var pass=document.getElementById('li-pass').value;
-  if(!input||!pass){showErr('lerr','Preencha todos os campos');return}
-  // se nao tem @ é username, buscar o email na tabela
-  var emailLogin=input;
-  if(!input.includes('@')){
-    try{
-      var uCheck=await sbFetch('usuarios?username=eq.'+encodeURIComponent(input)+'&select=username,empresa_id');
-      if(uCheck&&uCheck.length&&uCheck[0].username&&uCheck[0].username.includes('@')){
-        emailLogin=uCheck[0].username;
-      }else{
-        // username nao é email, buscar email pelo nome de usuario
-        var uCheck2=await sbFetch('usuarios?username=eq.'+encodeURIComponent(input)+'&select=*');
-        if(!uCheck2||!uCheck2.length){showErr('lerr','Usuário não encontrado');return}
-        // nao tem como fazer login sem email no supabase auth
-        // entao o username deve ser o email
-        showErr('lerr','Use seu email para entrar');return
-      }
-    }catch(e){showErr('lerr','Erro ao verificar usuário');return}
-  }
-  var res=await sbAuth('token?grant_type=password',{email:emailLogin,password:pass});
+  if(!email||!pass){showErr('lerr','Preencha todos os campos');return}
+  var res=await sbAuth('token?grant_type=password',{email:email,password:pass});
   if(res.error){_loginTentativas++;if(_loginTentativas>=5){_loginBloqueadoAte=Date.now()+15*60*1000;_loginTentativas=0;showErr('lerr','Conta bloqueada por 15 minutos após 5 tentativas.');}else{showErr('lerr','Usuário ou senha incorretos. Tentativa '+_loginTentativas+' de 5.');}return}
   _loginTentativas=0;
   var authId=res.user&&res.user.id;
