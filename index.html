@@ -2372,63 +2372,29 @@ var loadTimeout=setTimeout(function(){
   if(ld&&!ld.classList.contains('hidden')){localStorage.clear();ld.classList.add('hidden');document.getElementById('lscr').classList.remove('hidden')}
 },6000);
 
-async function init() {
+(async function init(){
   // verificar se veio de link de email
-  var isAuthCallback = await processarAuthCallback();
-  if (isAuthCallback) {
-    clearTimeout(loadTimeout);
-    document.getElementById('ldscr').classList.add('hidden');
-    return;
-  }
-  
-  try {
-    var session = LS.g('session');
-    if (session && session.me && session.empresa) {
-      me = session.me;
-      empresa = session.empresa;
+  var isAuthCallback=await processarAuthCallback();
+  if(isAuthCallback){clearTimeout(loadTimeout);document.getElementById('ldscr').classList.add('hidden');return}
+  try{
+    var session=LS.g('session');
+    if(session&&session.me&&session.empresa){
+      me=session.me;empresa=session.empresa;
       clearTimeout(loadTimeout);
       document.getElementById('ldscr').classList.add('hidden');
-      document.getElementById('upill-name').textContent = me.nome.split(' ')[0];
-      
-      var cache = LS.g('data_' + empresa.id);
-      if (cache) {
-        users = cache.users || [];
-        produtos = cache.produtos || [];
-        clientes = cache.clientes || [];
-        pedidos = cache.pedidos || [];
-        historico = cache.historico || [];
-        cupons = cache.cupons || [];
-        entradas = cache.entradas || [];
-        despesas = cache.despesas || [];
-      }
-
-      setupNav();
-      renderAll();
-      
-      // AJUSTE: Garante que o Painel (dash) seja o ecrã inicial se o utilizador tiver acesso
-      const navButtons = document.querySelectorAll('.nb');
-      if (can('dash')) {
-        goTo('dash', navButtons[0], 'Painel');
-        setDashPeriod('mes', navButtons[0]); // Inicializa as métricas do mês
-      } else {
-        goTo('pedidos', navButtons[1], 'Pedidos');
-      }
-      
+      document.getElementById('upill-name').textContent=me.nome.split(' ')[0];
+      var cache=LS.g('data_'+empresa.id);
+      if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[]}
+      setupNav();renderAll();
+      if(can('dash'))goTo('dash',document.querySelector('.nb'),'Painel');
+      else goTo('pedidos',document.querySelectorAll('.nb')[1],'Pedidos');
       syncNow();
-      pendingSync = LS.g('pending') || [];
-      if (pendingSync.length && isOnline) processPendingSync();
-      
-    } else {
+      pendingSync=LS.g('pending')||[];
+      if(pendingSync.length&&isOnline)processPendingSync();
+    }else{
       clearTimeout(loadTimeout);
       document.getElementById('ldscr').classList.add('hidden');
       document.getElementById('lscr').classList.remove('hidden');
-    }
-  } catch (e) {
-    console.error("Erro no init:", e);
-    clearTimeout(loadTimeout);
-    document.getElementById('ldscr').classList.add('hidden');
-    document.getElementById('lscr').classList.remove('hidden');
-  }
     }
   }catch(e){
     clearTimeout(loadTimeout);
