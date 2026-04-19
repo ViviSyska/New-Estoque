@@ -359,20 +359,14 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
 
     <!-- PAINEL -->
     <div id="sc-dash" class="sc active">
-      <div class="period-btns" id="dash-periods">
-        <button class="period-btn" onclick="setDashPeriod('hoje',this)">Hoje</button>
-        <button class="period-btn" onclick="setDashPeriod('semana',this)">Semana</button>
-        <button class="period-btn active" onclick="setDashPeriod('mes',this)">Mês</button>
-        <button class="period-btn" onclick="setDashPeriod('ano',this)">Ano</button>
-      </div>
       <div class="metrics">
-        <div class="met"><div class="met-ac" style="background:var(--r3)"></div><div class="ml">Faturamento</div><div class="mv" style="color:var(--r3)" id="d-fat">0,00</div><div class="ms">R$</div></div>
-        <div class="met"><div class="met-ac" style="background:var(--a)"></div><div class="ml">Abertos</div><div class="mv" id="d-open">0</div><div class="ms">comandas</div></div>
-        <div class="met"><div class="met-ac" style="background:var(--g)"></div><div class="ml">Concluídos</div><div class="mv" style="color:var(--g)" id="d-done">0</div><div class="ms">pedidos</div></div>
+        <div class="met"><div class="met-ac" style="background:var(--r3)"></div><div class="ml">Faturamento ano</div><div class="mv" style="color:var(--r3)" id="d-fat">0,00</div><div class="ms">R$</div></div>
+        <div class="met"><div class="met-ac" style="background:var(--a)"></div><div class="ml">Abertos agora</div><div class="mv" id="d-open">0</div><div class="ms">comandas</div></div>
+        <div class="met"><div class="met-ac" style="background:var(--g)"></div><div class="ml">Concluídos ano</div><div class="mv" style="color:var(--g)" id="d-done">0</div><div class="ms">pedidos</div></div>
         <div class="met"><div class="met-ac" style="background:var(--b)"></div><div class="ml">Ticket médio</div><div class="mv" id="d-tick">0,00</div><div class="ms">R$</div></div>
       </div>
-      <div class="card"><div class="card-accent"></div><div class="ch"><span class="ct">🏆 Mais vendidos</span><span class="b br" id="d-period-label">hoje</span></div><div id="d-top"></div></div>
-      <div class="card"><div class="card-accent"></div><div class="ch"><span class="ct">💰 Caixa</span></div><div id="d-caixa"></div></div>
+      <div class="card"><div class="card-accent"></div><div class="ch"><span class="ct">🏆 Mais vendidos</span><span class="b br">ano todo</span></div><div id="d-top"></div></div>
+      <div class="card"><div class="card-accent"></div><div class="ch"><span class="ct">💰 Caixa — ano</span></div><div id="d-caixa"></div></div>
       <div class="card" id="d-alcard" style="display:none"><div class="card-accent"></div><div class="ch"><span class="ct">⚠️ Estoque baixo</span></div><div id="d-al"></div></div>
     </div>
 
@@ -548,12 +542,42 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
     <!-- CLIENTES -->
     <div id="sc-clientes" class="sc">
       <div class="tabbar">
-        <button class="tbb active" onclick="clTab('hist',this)">Histórico</button>
+        <button class="tbb active" onclick="clTab('hist',this)">Comandas</button>
         <button class="tbb" onclick="clTab('lista',this)">Clientes</button>
         <button class="tbb" onclick="clTab('cad',this)">Cadastrar</button>
       </div>
-      <div id="cl-hist"><div id="hist-list"></div><div id="hist-empty" class="empty" style="display:none"><div class="ei">👥</div><div class="et">Sem histórico</div><div class="es">Conclua pedidos para ver aqui</div></div></div>
+
+      <!-- ABA HISTORICO GERAL -->
+      <div id="cl-hist">
+        <div class="period-btns" id="cl-periods">
+          <button class="period-btn" onclick="setClPeriod('hoje',this)">Hoje</button>
+          <button class="period-btn" onclick="setClPeriod('semana',this)">Semana</button>
+          <button class="period-btn active" onclick="setClPeriod('mes',this)">Mês</button>
+          <button class="period-btn" onclick="setClPeriod('ano',this)">Ano</button>
+          <button class="period-btn" onclick="setClPeriod('custom',this)">📅</button>
+        </div>
+        <div id="cl-custom-dates" style="display:none">
+          <div class="fr" style="margin-bottom:10px">
+            <div class="fg"><label>De</label><input type="date" id="cl-de" class="cal-input"></div>
+            <div class="fg"><label>Até</label><input type="date" id="cl-ate" class="cal-input"></div>
+          </div>
+        </div>
+        <div id="cl-resumo-bar" class="card" style="margin-bottom:10px">
+          <div class="card-accent"></div>
+          <div class="ch"><span class="ct">Resumo do período</span></div>
+          <div class="metrics" style="margin-bottom:0">
+            <div class="met"><div class="met-ac" style="background:var(--r3)"></div><div class="ml">Comandas</div><div class="mv" id="cl-total-ped">0</div><div class="ms">concluídas</div></div>
+            <div class="met"><div class="met-ac" style="background:var(--g)"></div><div class="ml">Total</div><div class="mv" style="color:var(--g);font-size:18px" id="cl-total-fat">0,00</div><div class="ms">R$</div></div>
+          </div>
+        </div>
+        <div id="hist-list"></div>
+        <div id="hist-empty" class="empty" style="display:none"><div class="ei">👥</div><div class="et">Sem comandas no período</div><div class="es">Conclua pedidos para ver aqui</div></div>
+      </div>
+
+      <!-- ABA LISTA CLIENTES -->
       <div id="cl-lista" style="display:none"><div id="clientes-lista"></div></div>
+
+      <!-- ABA CADASTRAR -->
       <div id="cl-cad" style="display:none">
         <div class="card"><div class="card-accent"></div>
           <div class="ct" style="margin-bottom:14px">Novo cliente</div>
@@ -738,6 +762,24 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
   </div>
 </div>
 
+<div class="mov" id="m-cl-hist">
+  <div class="msh"><div class="mhan"></div>
+    <div class="mhdr">
+      <div><div class="mtit" id="m-cl-nome">Histórico do cliente</div><div style="font-size:11px;color:var(--tx3);margin-top:2px" id="m-cl-info"></div></div>
+      <button class="btn btn-g btn-sm" onclick="closeModal('m-cl-hist')">Fechar</button>
+    </div>
+    <div class="mbdy">
+      <div class="card" style="margin-bottom:12px"><div class="card-accent"></div>
+        <div class="fr">
+          <div><div style="font-size:10px;color:var(--tx4)">Total de comandas</div><div style="font-size:20px;font-weight:700;font-family:var(--mo)" id="m-cl-qtd">0</div></div>
+          <div><div style="font-size:10px;color:var(--tx4)">Total gasto</div><div style="font-size:20px;font-weight:700;font-family:var(--mo);color:var(--g)" id="m-cl-total">R$ 0,00</div></div>
+        </div>
+      </div>
+      <div id="m-cl-list"></div>
+    </div>
+  </div>
+</div>
+
 <div class="mov" id="m-cupom">
   <div class="msh"><div class="mhan"></div>
     <div class="mhdr"><div class="mtit" id="m-cup-tit">Novo cupom</div><button class="btn btn-g btn-sm" onclick="closeModal('m-cupom')">Fechar</button></div>
@@ -861,7 +903,10 @@ function sbFetch(path, opts){
   return fetch(SB_URL+'/rest/v1/'+path, {
     headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation',...(opts&&opts.headers||{})},
     ...opts
-  }).then(r=>r.ok?r.json().catch(()=>null):r.json().then(e=>{throw e}));
+  }).then(r=>{
+    if(r.ok)return r.json().catch(()=>null);
+    return r.text().then(t=>{console.error('sbFetch error:',r.status,t);throw new Error(t)});
+  });
 }
 
 function sbAuth(path, body){
@@ -985,14 +1030,38 @@ async function processPendingSync(){
 
 function dbSave(table, data){
   var empData={...data, empresa_id:empresa?empresa.id:''};
+  // remover campos internos que nao existem no banco
+  delete empData._local;delete empData._pending;delete empData._moveToHistory;
+  // salvar no cache local imediatamente
+  if(empresa){
+    var cache=LS.g('data_'+empresa.id)||{};
+    if(!cache[table])cache[table]=[];
+    var idx=cache[table].findIndex(x=>String(x.id)===String(data.id));
+    if(idx>=0)cache[table][idx]=empData;else cache[table].unshift(empData);
+    LS.s('data_'+empresa.id,cache);
+  }
   if(isOnline){
-    sbFetch(table+'?id=eq.'+data.id,{method:'DELETE'}).catch(()=>{}).then(()=>
-      sbFetch(table,{method:'POST',body:JSON.stringify(empData)}).catch(e=>console.log(e))
-    );
+    // usar UPSERT - mais confiável que DELETE+INSERT
+    sbFetch(table+'?on_conflict=id',{
+      method:'POST',
+      headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
+      body:JSON.stringify(empData)
+    }).catch(e=>{
+      console.error('dbSave error',table,e);
+      // fallback: DELETE + INSERT
+      sbFetch(table+'?id=eq.'+data.id,{method:'DELETE'}).catch(()=>{}).then(()=>
+        sbFetch(table,{method:'POST',body:JSON.stringify(empData)}).catch(e2=>console.error('dbSave fallback error',e2))
+      );
+    });
   }else{queueSync('upsert',table,empData)}
 }
 
 function dbDelete(table, id){
+  // remover do cache local imediatamente
+  if(empresa){
+    var cache=LS.g('data_'+empresa.id)||{};
+    if(cache[table]){cache[table]=cache[table].filter(x=>String(x.id)!==String(id));LS.s('data_'+empresa.id,cache)}
+  }
   if(isOnline){sbFetch(table+'?id=eq.'+id,{method:'DELETE'}).catch(e=>console.log(e))}
   else{queueSync('delete',table,null,id)}
 }
@@ -1178,13 +1247,7 @@ function updBadge(){
 // ══════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════
-function setDashPeriod(p,el){
-  dashPeriod=p;
-  document.querySelectorAll('#dash-periods .period-btn').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('d-period-label').textContent=p==='ano'?'ano todo':p;
-  renderDash();
-}
+// setDashPeriod removido - painel sempre mostra ano todo
 
 function setCxPeriod(p,el){
   cxPeriod=p;
@@ -1257,7 +1320,17 @@ function renderHistorico(){
 
 function renderDash(){
   if(!can('dash'))return;
-  var filtered=historico.filter(p=>periodFilter(p.finalizado_em||p.criado_em,dashPeriod));
+  // sempre mostrar ano todo, sem filtro
+  var now=new Date();
+  var anoInicio=new Date(now.getFullYear(),0,1);
+  var filtered=historico.filter(p=>{
+    var ts=p.finalizado_em||p.criado_em;
+    if(!ts)return true;
+    var d;
+    if(typeof ts==='string'&&ts.includes('T')){d=new Date(ts)}
+    else{var n=parseInt(ts);d=n>0?new Date(n):new Date(ts)}
+    return d>=anoInicio;
+  });
   var fat=filtered.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
   var tick=filtered.length?fat/filtered.length:0;
   document.getElementById('d-fat').textContent=fmtN(fat);
@@ -1267,12 +1340,12 @@ function renderDash(){
   var byPgto={Pix:0,Dinheiro:0,'Crédito':0,'Débito':0};
   filtered.forEach(p=>{if(byPgto[p.pgto]!==undefined)byPgto[p.pgto]+=parseFloat(p.total_editado||p.total)||0});
   document.getElementById('d-caixa').innerHTML=Object.entries(byPgto).map(([k,v])=>`<div class="tr"><span class="tr-l">${k}</span><span class="tr-v">${fmt(v)}</span></div>`).join('')+
-    `<div class="div"></div><div class="tbox"><span class="tbox-l">Total vendas</span><span class="tbox-v">${fmt(fat)}</span></div>`;
+    `<div class="div"></div><div class="tbox"><span class="tbox-l">Total vendas ${now.getFullYear()}</span><span class="tbox-v">${fmt(fat)}</span></div>`;
   var vendas={};
   filtered.forEach(p=>{var its=parseItens(p.itens);its.forEach(it=>{vendas[it.nome]=(vendas[it.nome]||0)+(parseInt(it.qtd)||1)})});
   var top=Object.entries(vendas).sort((a,b)=>b[1]-a[1]).slice(0,5);
   document.getElementById('d-top').innerHTML=top.length?top.map(([n,q],i)=>`<div class="tr"><span class="tr-l">${['🥇','🥈','🥉','4.','5.'][i]} ${n}</span><span class="b br">${q} un</span></div>`).join(''):
-    '<div style="font-size:12px;color:var(--tx4);text-align:center;padding:8px 0">Nenhuma venda no período</div>';
+    '<div style="font-size:12px;color:var(--tx4);text-align:center;padding:8px 0">Nenhuma venda ainda este ano</div>';
   var baixo=produtos.filter(p=>(parseInt(p.qtd)||0)<=(parseInt(p.minimo)||0));
   var ac=document.getElementById('d-alcard');
   if(!baixo.length){ac.style.display='none'}
@@ -1861,6 +1934,7 @@ function clTab(t,el){
   document.getElementById('cl-'+t).style.display='block';
   document.querySelectorAll('#sc-clientes .tbb').forEach(b=>b.classList.remove('active'));
   if(el)el.classList.add('active');
+  if(t==='hist'||t==='lista')renderClientes();
 }
 
 function showHistDet(id){
