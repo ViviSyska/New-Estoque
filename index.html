@@ -197,6 +197,14 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
 .forgot-link{text-align:center;margin-top:14px;font-size:12px;color:var(--tx4)}
 .forgot-link span{color:var(--r3);cursor:pointer;font-weight:500}
 
+/* ── AUTH CALLBACK ── */
+#auth-scr{position:fixed;inset:0;z-index:350;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;padding:28px}
+#auth-scr.show{display:flex}
+.auth-card{background:var(--card);border:1px solid var(--bd2);border-radius:20px;padding:28px;width:100%;max-width:400px;text-align:center}
+.auth-icon{font-size:48px;margin-bottom:16px}
+.auth-title{font-size:18px;font-weight:700;margin-bottom:8px}
+.auth-sub{font-size:13px;color:var(--tx3);margin-bottom:20px;line-height:1.6}
+
 /* ── LOADING ── */
 #ldscr{position:fixed;inset:0;background:var(--bg);z-index:400;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
 #ldscr.hidden{display:none}
@@ -277,6 +285,26 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
   <div class="llogo" style="width:76px;height:76px;background:linear-gradient(135deg,var(--r5),var(--r));border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;font-family:var(--mo);letter-spacing:-2px">NS</div>
   <div class="spin"></div>
   <div class="ld-text">Conectando ao servidor...</div>
+</div>
+
+<!-- AUTH CALLBACK (reset senha, confirmacao, convite) -->
+<div id="auth-scr">
+  <div style="text-align:center;margin-bottom:28px">
+    <div class="llogo">NS</div>
+    <div style="font-size:18px;font-weight:800;color:#fff;margin-top:12px">NS Estoque Pro</div>
+  </div>
+  <div class="auth-card">
+    <div class="auth-icon" id="auth-icon">⏳</div>
+    <div class="auth-title" id="auth-title">Processando...</div>
+    <div class="auth-sub" id="auth-sub">Aguarde um momento</div>
+    <div id="auth-form" style="display:none">
+      <div class="fg"><label>Nova senha</label><input id="auth-pass" type="password" placeholder="Mínimo 8 caracteres"></div>
+      <div class="fg"><label>Confirmar nova senha</label><input id="auth-pass2" type="password" placeholder="Repita a senha"></div>
+      <div class="lerr" id="auth-err"></div>
+      <button class="lbtn" onclick="salvarNovaSenha()">Salvar nova senha</button>
+    </div>
+    <button class="lbtn" id="auth-btn" style="display:none" onclick="irParaLogin()">Ir para o login</button>
+  </div>
 </div>
 
 <!-- LOGIN -->
@@ -2280,6 +2308,113 @@ if('serviceWorker' in navigator){
 // ══════════════════════════════════════
 // INIT
 // ══════════════════════════════════════
+// ══════════════════════════════════════
+// AUTH CALLBACK — reset senha, confirmacao, convite
+// ══════════════════════════════════════
+var _authToken=null;
+
+function lerHashParams(){
+  var hash=window.location.hash.substring(1);
+  var params={};
+  hash.split('&').forEach(p=>{var kv=p.split('=');if(kv[0])params[kv[0]]=decodeURIComponent(kv[1]||'')});
+  return params;
+}
+
+async function processarAuthCallback(){
+  var params=lerHashParams();
+  var type=params.type;
+  var token=params.access_token;
+  if(!type&&!token)return false;
+
+  var scr=document.getElementById('auth-scr');
+  scr.classList.add('show');
+  _authToken=token;
+
+  if(type==='recovery'){
+    // redefinir senha
+    document.getElementById('auth-icon').textContent='🔑';
+    document.getElementById('auth-title').textContent='Redefinir senha';
+    document.getElementById('auth-sub').textContent='Digite sua nova senha abaixo.';
+    document.getElementById('auth-form').style.display='block';
+    document.getElementById('auth-btn').style.display='none';
+
+  }else if(type==='signup'||type==='email_change'){
+    // confirmar email
+    document.getElementById('auth-icon').textContent='⏳';
+    document.getElementById('auth-title').textContent='Confirmando email...';
+    document.getElementById('auth-sub').textContent='Aguarde...';
+    try{
+      var res=await fetch(SB_URL+'/auth/v1/user',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token}});
+      var data=await res.json();
+      if(data.email){
+        document.getElementById('auth-icon').textContent='✅';
+        document.getElementById('auth-title').textContent='Email confirmado!';
+        document.getElementById('auth-sub').textContent='Sua conta está ativa. Agora pode entrar no sistema.';
+        document.getElementById('auth-btn').style.display='block';
+        document.getElementById('auth-btn').textContent='Entrar no sistema';
+      }else{
+        document.getElementById('auth-icon').textContent='❌';
+        document.getElementById('auth-title').textContent='Erro na confirmação';
+        document.getElementById('auth-sub').textContent='Link inválido ou expirado. Solicite um novo.';
+        document.getElementById('auth-btn').style.display='block';
+        document.getElementById('auth-btn').textContent='Voltar ao login';
+      }
+    }catch(e){
+      document.getElementById('auth-icon').textContent='❌';
+      document.getElementById('auth-title').textContent='Erro de conexão';
+      document.getElementById('auth-sub').textContent='Verifique sua internet e tente novamente.';
+      document.getElementById('auth-btn').style.display='block';
+    }
+
+  }else if(type==='invite'){
+    // convite - criar senha
+    document.getElementById('auth-icon').textContent='👋';
+    document.getElementById('auth-title').textContent='Bem-vindo!';
+    document.getElementById('auth-sub').textContent='Crie uma senha para acessar o sistema.';
+    document.getElementById('auth-form').style.display='block';
+    document.getElementById('auth-btn').style.display='none';
+
+  }else{
+    return false;
+  }
+  // limpar hash da URL
+  history.replaceState(null,null,' ');
+  return true;
+}
+
+async function salvarNovaSenha(){
+  var pass=document.getElementById('auth-pass').value;
+  var pass2=document.getElementById('auth-pass2').value;
+  var err=document.getElementById('auth-err');
+  if(pass.length<8){err.textContent='Senha deve ter mínimo 8 caracteres';err.classList.add('show');return}
+  if(pass!==pass2){err.textContent='Senhas não coincidem';err.classList.add('show');return}
+  err.classList.remove('show');
+  try{
+    var res=await fetch(SB_URL+'/auth/v1/user',{
+      method:'PUT',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+_authToken,'Content-Type':'application/json'},
+      body:JSON.stringify({password:pass})
+    });
+    var data=await res.json();
+    if(data.email||data.id){
+      document.getElementById('auth-icon').textContent='✅';
+      document.getElementById('auth-title').textContent='Senha salva!';
+      document.getElementById('auth-sub').textContent='Sua senha foi atualizada com sucesso.';
+      document.getElementById('auth-form').style.display='none';
+      document.getElementById('auth-btn').style.display='block';
+      document.getElementById('auth-btn').textContent='Entrar no sistema';
+    }else{
+      err.textContent='Erro ao salvar. Link pode ter expirado.';err.classList.add('show');
+    }
+  }catch(e){err.textContent='Erro de conexão.';err.classList.add('show')}
+}
+
+function irParaLogin(){
+  document.getElementById('auth-scr').classList.remove('show');
+  document.getElementById('lscr').classList.remove('hidden');
+  _authToken=null;
+}
+
 // limpar cache se URL tiver ?reset
 if(window.location.search.includes('reset')){localStorage.clear();window.location.href=window.location.pathname}
 
@@ -2290,6 +2425,9 @@ var loadTimeout=setTimeout(function(){
 },6000);
 
 (async function init(){
+  // verificar se veio de link de email
+  var isAuthCallback=await processarAuthCallback();
+  if(isAuthCallback){clearTimeout(loadTimeout);document.getElementById('ldscr').classList.add('hidden');return}
   try{
     var session=LS.g('session');
     if(session&&session.me&&session.empresa){
