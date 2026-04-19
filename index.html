@@ -1871,48 +1871,143 @@ function gerarRel(){
 // ══════════════════════════════════════
 // CLIENTES
 // ══════════════════════════════════════
+var clPeriod='mes';
+
+function setClPeriod(p,el){
+  clPeriod=p;
+  document.querySelectorAll('#cl-periods .period-btn').forEach(b=>b.classList.remove('active'));
+  if(el)el.classList.add('active');
+  var cd=document.getElementById('cl-custom-dates');
+  if(cd)cd.style.display=p==='custom'?'block':'none';
+  renderClientes();
+}
+
 function renderClientes(){
-  var byCl={};historico.forEach(p=>{var k=p.cliente_id||'sem';if(!byCl[k])byCl[k]=[];byCl[k].push(p)});
+  var de=document.getElementById('cl-de')?.value;
+  var ate=document.getElementById('cl-ate')?.value;
+  // filtrar historico pelo periodo
+  var filtHist=historico.filter(p=>periodFilter(p.finalizado_em||p.criado_em,clPeriod,de,ate));
+  // resumo
+  var totPed=filtHist.length;
+  var totFat=filtHist.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
+  var elQtd=document.getElementById('cl-total-ped');if(elQtd)elQtd.textContent=totPed;
+  var elFat=document.getElementById('cl-total-fat');if(elFat)elFat.textContent=fmtN(totFat);
+  // agrupar por cliente
+  var byCl={};
+  filtHist.forEach(p=>{var k=p.cliente_id||'_sem';if(!byCl[k])byCl[k]=[];byCl[k].push(p)});
   var hl=document.getElementById('hist-list'),he=document.getElementById('hist-empty');
-  if(!historico.length){if(hl)hl.innerHTML='';if(he)he.style.display='block'}
-  else{
+  if(!filtHist.length){
+    if(hl)hl.innerHTML='';
+    if(he)he.style.display='block';
+  }else{
     if(he)he.style.display='none';
-    if(hl)hl.innerHTML=Object.entries(byCl).slice(0,20).map(([cid,orders])=>{
-      var cl=clientes.find(c=>String(c.id)===String(cid));var nome=cl?cl.nome:'Sem cliente';
+    var sorted=Object.entries(byCl).sort((a,b)=>
+      b[1].reduce((s,o)=>s+(parseFloat(o.total_editado||o.total)||0),0)-
+      a[1].reduce((s,o)=>s+(parseFloat(o.total_editado||o.total)||0),0)
+    );
+    if(hl)hl.innerHTML=sorted.map(([cid,orders])=>{
+      var cl=clientes.find(c=>String(c.id)===String(cid));
+      var nome=cid==='_sem'?'Sem cliente':(cl?cl.nome:'Cliente');
       var tot=orders.reduce((a,o)=>a+(parseFloat(o.total_editado||o.total)||0),0);
-      return`<div class="card"><div class="card-accent"></div>
+      var ultPed=orders[0];
+      var ultData='';
+      if(ultPed){
+        var ts=ultPed.finalizado_em||ultPed.criado_em;
+        var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||ts);
+        ultData=isNaN(d)?'':d.toLocaleDateString('pt-BR');
+      }
+      return`<div class="card" style="cursor:pointer" onclick="verHistCliente('${cid}')">
+        <div class="card-accent"></div>
         <div class="ch">
-          <div style="display:flex;align-items:center;gap:9px">
-            <div class="av" style="width:36px;height:36px;font-size:12px">${ini(nome)}</div>
-            <div><div class="ct">${nome}</div><div class="cs">${orders.length} pedido(s) · ${fmt(tot)}</div></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="av" style="width:38px;height:38px;font-size:13px">${ini(nome)}</div>
+            <div><div class="ct">${nome}</div><div class="cs">${orders.length} comanda(s)${ultData?' · último: '+ultData:''}</div></div>
           </div>
-          <div style="display:flex;align-items:center;gap:5px">
-            <span class="b bg">ativo</span>
-            ${cl?`<button class="btn btn-d btn-sm" style="padding:4px 8px" onclick="excluirCliente('${cl.id}')">🗑️</button>`:''}
+          <div style="text-align:right">
+            <div style="font-size:17px;font-weight:700;color:var(--g);font-family:var(--mo)">${fmt(tot)}</div>
+            <div style="font-size:10px;color:var(--tx4)">total gasto</div>
           </div>
         </div>
-        ${orders.slice(0,4).map(o=>`<div class="tr" style="cursor:pointer" onclick="showHistDet('${o.id}')"><span class="tr-l">#${String(o.id).slice(-6)} — ${o.tipo}</span><span class="tr-v">${fmt(o.total_editado||o.total)}</span></div>`).join('')}
-      </div>`}).join('')
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">
+          ${orders.slice(0,3).map(o=>`<span class="chip">#${String(o.id).slice(-6)} ${fmt(o.total_editado||o.total)}</span>`).join('')}
+          ${orders.length>3?`<span class="chip">+${orders.length-3} mais</span>`:''}
+        </div>
+        <div style="font-size:10px;color:var(--tx4);margin-top:5px;text-align:right">Toque para ver histórico →</div>
+      </div>`;
+    }).join('');
   }
   // lista clientes
   var cl2=document.getElementById('clientes-lista');
   if(cl2){
-    cl2.innerHTML=!clientes.length?`<div class="empty"><div class="ei">👤</div><div class="et">Nenhum cliente</div></div>`:
-      clientes.map(c=>`<div class="card"><div class="card-accent"></div>
-        <div class="ch">
-          <div style="display:flex;align-items:center;gap:9px">
-            <div class="av" style="width:36px;height:36px;font-size:12px">${ini(c.nome)}</div>
-            <div>
-              <div class="ct">${c.nome}</div>
-              <div class="cs">${c.cpf_cnpj?c.cpf_cnpj+' · ':''}${c.telefone||''}${c.endereco?' · '+c.endereco:''}</div>
+    if(!clientes.length){
+      cl2.innerHTML='<div class="empty"><div class="ei">👤</div><div class="et">Nenhum cliente</div></div>';
+    }else{
+      cl2.innerHTML=clientes.map(c=>{
+        var pedsCl=historico.filter(p=>String(p.cliente_id)===String(c.id));
+        var totCl=pedsCl.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
+        return`<div class="card"><div class="card-accent"></div>
+          <div class="ch">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="av" style="width:38px;height:38px;font-size:13px">${ini(c.nome)}</div>
+              <div><div class="ct">${c.nome}</div><div class="cs">${c.cpf_cnpj?c.cpf_cnpj+' · ':''}${c.telefone||''}</div>${c.endereco?`<div class="cs">${c.endereco}</div>`:''}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:14px;font-weight:700;color:var(--g);font-family:var(--mo)">${fmt(totCl)}</div>
+              <div style="font-size:10px;color:var(--tx4)">${pedsCl.length} ped.</div>
             </div>
           </div>
-          <button class="btn btn-d btn-sm" style="padding:4px 8px" onclick="excluirCliente('${c.id}')">🗑️</button>
-        </div>
-      </div>`).join('')
+          <div style="display:flex;gap:6px;margin-top:8px">
+            ${c.telefone?`<button class="btn btn-s btn-sm" onclick="window.open('https://wa.me/55'+'${c.telefone}'.replace(/\D/g,''),'_blank')">📱 WhatsApp</button>`:''}
+            <button class="btn btn-g btn-sm" onclick="verHistCliente('${c.id}')">📋 Histórico</button>
+            <button class="btn btn-d btn-sm" style="margin-left:auto" onclick="excluirCliente('${c.id}')">🗑️</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
   }
 }
 
+function verHistCliente(cid){
+  var cl=clientes.find(c=>String(c.id)===String(cid));
+  var nome=cid==='_sem'?'Sem cliente':(cl?cl.nome:'Cliente');
+  var pedsCl=historico.filter(p=>String(p.cliente_id||'_sem')===String(cid));
+  var tot=pedsCl.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
+  document.getElementById('m-cl-nome').textContent=nome;
+  var info=[];
+  if(cl&&cl.cpf_cnpj)info.push(cl.cpf_cnpj);
+  if(cl&&cl.telefone)info.push(cl.telefone);
+  document.getElementById('m-cl-info').textContent=info.join(' · ');
+  document.getElementById('m-cl-qtd').textContent=pedsCl.length;
+  document.getElementById('m-cl-total').textContent=fmt(tot);
+  var list=document.getElementById('m-cl-list');
+  if(!pedsCl.length){
+    list.innerHTML='<div class="empty"><div class="ei">📋</div><div class="et">Sem comandas finalizadas</div></div>';
+  }else{
+    list.innerHTML=pedsCl.map(p=>{
+      var its=parseItens(p.itens);
+      var ts=p.finalizado_em||p.criado_em;
+      var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||ts);
+      var data=isNaN(d)?'':d.toLocaleString('pt-BR');
+      return`<div class="card" style="cursor:pointer" onclick="showHistDet('${p.id}')">
+        <div class="card-accent"></div>
+        <div class="ch">
+          <div>
+            <div class="ct">#${String(p.id).slice(-6)} — ${p.tipo}</div>
+            <div class="cs">${data}${p.pgto?' · '+p.pgto:''}${p.vendedor_nome?' · '+p.vendedor_nome:''}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:16px;font-weight:700;color:var(--r3);font-family:var(--mo)">${fmt(p.total_editado||p.total)}</div>
+            <div style="font-size:10px;color:var(--tx4)">${its.length} item(ns)</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px">
+          ${its.slice(0,4).map(it=>`<span class="chip">${it.qtd}x ${it.nome}</span>`).join('')}
+        </div>
+      </div>`;
+    }).join('');
+  }
+  openModal('m-cl-hist');
+}
 function addCliente(){
   var nome=document.getElementById('cl-nome').value.trim();
   if(!nome){toast('Informe o nome','err');return}
@@ -2148,6 +2243,7 @@ function imprimirTodosPendentes(){
   abrirJanelaPDF(html);
 }
 
+var _editCupId=null;
 function renderCupons(){
   var cl=document.getElementById('cup-list'),ce=document.getElementById('cup-empty');
   if(!cupons.length){if(cl)cl.innerHTML='';if(ce)ce.style.display='block';return}
