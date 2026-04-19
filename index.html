@@ -360,10 +360,10 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
     <!-- PAINEL -->
     <div id="sc-dash" class="sc active">
       <div class="period-btns" id="dash-periods">
-        <button class="period-btn active" onclick="setDashPeriod('hoje',this)">Hoje</button>
+        <button class="period-btn" onclick="setDashPeriod('hoje',this)">Hoje</button>
         <button class="period-btn" onclick="setDashPeriod('semana',this)">Semana</button>
-        <button class="period-btn" onclick="setDashPeriod('mes',this)">Mês</button>
-        <button class="period-btn active-year" onclick="setDashPeriod('ano',this)">Ano</button>
+        <button class="period-btn active" onclick="setDashPeriod('mes',this)">Mês</button>
+        <button class="period-btn" onclick="setDashPeriod('ano',this)">Ano</button>
       </div>
       <div class="metrics">
         <div class="met"><div class="met-ac" style="background:var(--r3)"></div><div class="ml">Faturamento</div><div class="mv" style="color:var(--r3)" id="d-fat">0,00</div><div class="ms">R$</div></div>
@@ -432,9 +432,9 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
       </div>
       <div id="cx-res">
         <div class="period-btns" id="cx-periods">
-          <button class="period-btn active" onclick="setCxPeriod('hoje',this)">Hoje</button>
+          <button class="period-btn" onclick="setCxPeriod('hoje',this)">Hoje</button>
           <button class="period-btn" onclick="setCxPeriod('semana',this)">Semana</button>
-          <button class="period-btn" onclick="setCxPeriod('mes',this)">Mês</button>
+          <button class="period-btn active" onclick="setCxPeriod('mes',this)">Mês</button>
           <button class="period-btn" onclick="setCxPeriod('ano',this)">Ano</button>
         </div>
         <div class="metrics">
@@ -886,7 +886,7 @@ function sbRpc(fn, params){
 var me=null, empresa=null;
 var users=[], produtos=[], clientes=[], pedidos=[], historico=[], cupons=[], despesas=[], entradas=[];
 var pendingSync=[];
-var dashPeriod='ano', relPeriod='hoje', cxPeriod='hoje', histPeriod='hoje', entPeriod='hoje', despPeriod='hoje';
+var dashPeriod='mes', relPeriod='mes', cxPeriod='mes', histPeriod='mes', entPeriod='mes', despPeriod='mes';
 var isOnline=navigator.onLine;
 
 // localStorage cache
@@ -918,10 +918,17 @@ function ini(n){return(n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpp
 function roleBadge(r){var l={admin:'👑 Admin',gerente:'📊 Gerente',vendedor:'🛒 Vendedor',viewer:'👁️ Viewer',super:'⭐ Super Admin'};return`<span class="b role-${r}">${l[r]||r}</span>`}
 function getToday(){var d=new Date();return d.toISOString().split('T')[0]}
 function periodFilter(ts,period,de,ate){
-  var d=new Date(parseInt(ts)||ts);
+  // aceita timestamp numerico, string numerica e ISO date do Supabase
+  var d;
+  if(!ts)return true;
+  if(typeof ts==='number'){d=new Date(ts)}
+  else if(typeof ts==='string'&&ts.includes('-')&&ts.includes('T')){d=new Date(ts)}
+  else if(typeof ts==='string'&&ts.includes('-')&&!ts.includes('T')){d=new Date(ts+'T00:00:00')}
+  else{var n=parseInt(ts);d=n>0?new Date(n):new Date(ts)}
+  if(isNaN(d.getTime()))return true;
   var now=new Date();
   if(period==='hoje'){var t=new Date();t.setHours(0,0,0,0);return d>=t}
-  if(period==='semana'){var t=new Date();t.setDate(t.getDate()-7);return d>=t}
+  if(period==='semana'){var t=new Date();t.setDate(t.getDate()-7);t.setHours(0,0,0,0);return d>=t}
   if(period==='mes'){var t=new Date(now.getFullYear(),now.getMonth(),1);return d>=t}
   if(period==='ano'){var t=new Date(now.getFullYear(),0,1);return d>=t}
   if(period==='custom'&&de&&ate){var ds=new Date(de);var dt=new Date(ate);dt.setHours(23,59,59);return d>=ds&&d<=dt}
@@ -1013,6 +1020,8 @@ async function syncNow(){
     historico=his||[];cupons=cup||[];entradas=ent||[];despesas=desp||[];
     LS.s('data_'+eid,{users,produtos,clientes,pedidos,historico,cupons,entradas,despesas,ts:Date.now()});
     setDot('online');
+    // atualizar nome da empresa na topbar
+    if(empresa&&empresa.nome){var tb=document.querySelector('.tb-title');if(tb)tb.textContent=empresa.nome}
     renderAll();
     var pending=LS.g('pending')||[];
     if(pending.length)await processPendingSync();
@@ -1038,6 +1047,9 @@ function ltab(tab,el){
 }
 function showErr(id,msg){var e=document.getElementById(id);e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),4000)}
 
+// controle de tentativas de login
+var _loginTentativas=0;var _loginBloqueadoAte=0;
+
 async function doLogin(){
   if(Date.now()<_loginBloqueadoAte){
     var mins=Math.ceil((_loginBloqueadoAte-Date.now())/60000);
@@ -1054,7 +1066,7 @@ async function doLogin(){
   try{
     var userData=await sbFetch('usuarios?id=eq.'+authId+'&select=*');
     if(!userData||!userData.length){
-      userData=await sbFetch('usuarios?username=eq.'+encodeURIComponent(emailLogin)+'&select=*');
+      userData=await sbFetch('usuarios?username=eq.'+encodeURIComponent(email)+'&select=*');
     }
     if(!userData||!userData.length){showErr('lerr','Usuário não encontrado. Contate o administrador.');return}
     me=userData[0];
@@ -1065,9 +1077,6 @@ async function doLogin(){
     afterLogin();
   }catch(e){showErr('lerr','Erro ao carregar dados. Verifique sua conexão.')}
 }
-
-// controle de tentativas de login
-var _loginTentativas=0;var _loginBloqueadoAte=0;
 
 async function doRegister(){
   var nome=document.getElementById('rn').value.trim();
@@ -2065,67 +2074,6 @@ function imprimirTodosPendentes(){
   abrirJanelaPDF(html);
 }
 
-function imprimirRecibo(){
-  var p=window._recP;if(!p)return;
-  var cl=clientes.find(c=>String(c.id)===String(p.cliente_id));
-  var its=parseItens(p.itens);
-  var emp=empresa||{};
-  var html=`<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#000">
-    <div style="border-bottom:2px solid #000;padding-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start">
-      <div>
-        <div style="font-size:20px;font-weight:700">${emp.nome||'NS Estoque Pro'}</div>
-        ${emp.cpf_cnpj?`<div style="font-size:12px;color:#555">CNPJ/CPF: ${emp.cpf_cnpj}</div>`:''}
-        ${emp.endereco?`<div style="font-size:12px;color:#555">${emp.endereco}</div>`:''}
-        ${emp.telefone?`<div style="font-size:12px;color:#555">${emp.telefone}</div>`:''}
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:14px;font-weight:700">RECIBO</div>
-        <div style="font-size:12px;color:#555">#${String(p.id).slice(-6)}</div>
-        <div style="font-size:12px;color:#555">${new Date(parseInt(p.finalizado_em||p.criado_em)||Date.now()).toLocaleString('pt-BR')}</div>
-      </div>
-    </div>
-    ${cl?`<div style="background:#f5f5f5;padding:12px;margin:12px 0;border-radius:6px">
-      <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;margin-bottom:6px">Dados do cliente</div>
-      <div style="font-size:13px"><strong>${cl.nome}</strong></div>
-      ${cl.cpf_cnpj?`<div style="font-size:12px;color:#555">CPF/CNPJ: ${cl.cpf_cnpj}</div>`:''}
-      ${cl.endereco?`<div style="font-size:12px;color:#555">${cl.endereco}</div>`:''}
-    </div>`:''}
-    <div style="font-size:12px;color:#555;margin:10px 0">
-      Tipo: ${p.tipo} · Pagamento: ${p.pgto||'Pendente'} · Vendedor: ${p.vendedor_nome||'—'}
-    </div>
-    <table style="width:100%;border-collapse:collapse;margin:12px 0">
-      <thead><tr style="border-bottom:1px solid #000">
-        <th style="text-align:left;padding:6px 0;font-size:12px">Item</th>
-        <th style="text-align:center;padding:6px 0;font-size:12px">Qtd</th>
-        <th style="text-align:right;padding:6px 0;font-size:12px">Unit.</th>
-        <th style="text-align:right;padding:6px 0;font-size:12px">Total</th>
-      </tr></thead>
-      <tbody>${its.map(it=>`<tr style="border-bottom:1px dashed #ddd">
-        <td style="padding:6px 0;font-size:13px">${it.nome}${it.cupom?' ['+it.cupom+']':''}</td>
-        <td style="text-align:center;font-size:13px">${it.qtd}</td>
-        <td style="text-align:right;font-size:13px">${fmt(it.precoFinal||it.precoUnit)}</td>
-        <td style="text-align:right;font-size:13px">${fmt(it.total)}</td>
-      </tr>`).join('')}</tbody>
-    </table>
-    <div style="border-top:2px solid #000;padding-top:12px;display:flex;justify-content:space-between;font-size:18px;font-weight:700">
-      <span>TOTAL</span><span>${fmt(p.total_editado||p.total)}</span>
-    </div>
-    <div style="margin-top:40px;display:flex;justify-content:space-between">
-      <div style="text-align:center;width:45%"><div style="border-top:1px solid #000;padding-top:6px;font-size:11px;color:#555">Assinatura do cliente<br>${cl?cl.nome:''}</div></div>
-      <div style="text-align:center;width:45%"><div style="border-top:1px solid #000;padding-top:6px;font-size:11px;color:#555">${emp.nome||'NS Estoque Pro'}</div></div>
-    </div>
-    ${emp.rodape?`<div style="text-align:center;margin-top:20px;font-size:12px;color:#888;border-top:1px solid #ddd;padding-top:12px">${emp.rodape}</div>`:''}
-  </div>`;
-  document.getElementById('print-area').innerHTML=html;
-  document.getElementById('print-area').style.display='block';
-  window.print();
-  setTimeout(()=>{document.getElementById('print-area').style.display='none'},500);
-}
-
-// ══════════════════════════════════════
-// CUPONS
-// ══════════════════════════════════════
-var _editCupId=null;
 function renderCupons(){
   var cl=document.getElementById('cup-list'),ce=document.getElementById('cup-empty');
   if(!cupons.length){if(cl)cl.innerHTML='';if(ce)ce.style.display='block';return}
