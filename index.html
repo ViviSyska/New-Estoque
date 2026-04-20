@@ -266,6 +266,9 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
 .role-viewer{color:var(--tx3);border-color:var(--bd2);background:var(--bg3)}
 .role-super{color:#C4B5FD;border-color:rgba(139,92,246,.35);background:rgba(139,92,246,.12)}
 
+/* ── PGTO CHIPS ── */
+.pgto-chip{padding:7px 16px;border-radius:20px;border:1px solid var(--bd3);background:var(--bg3);color:var(--tx3);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--fn);transition:all .2s}
+.pgto-chip.active{background:rgba(16,185,129,.15);border-color:var(--g);color:#6EE7B7}
 /* ── CALENDAR ── */
 .cal-input{background:var(--bg3);border:1px solid var(--bd3);border-radius:10px;color:var(--tx);padding:10px 12px;font-size:13px;font-family:var(--fn);width:100%;outline:none}
 .cal-input:focus{border-color:var(--r)}
@@ -371,11 +374,21 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
 
     <!-- PEDIDOS -->
     <div id="sc-pedidos" class="sc">
-      <div style="display:flex;gap:8px;margin-bottom:10px">
-        <button class="btn btn-g btn-bl btn-sm" onclick="imprimirTodosPendentes()" id="btn-print-all" style="display:none">🏷️ Etiquetas pendentes</button>
+      <div class="tabbar">
+        <button class="tbb active" id="tab-abertos" onclick="pedTab('abertos',this)">Abertos</button>
+        <button class="tbb" id="tab-pendentes" onclick="pedTab('pendentes',this)">🟠 Pendentes<span id="badge-pend" style="display:none;background:var(--a);color:#000;font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;margin-left:4px">0</span></button>
       </div>
-      <div id="ped-list"></div>
-      <div id="ped-empty" class="empty" style="display:none"><div class="ei">🧾</div><div class="et">Nenhuma comanda aberta</div><div class="es">Toque em "+ Novo Pedido" para criar</div></div>
+      <div id="ped-abertos">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="btn btn-g btn-bl btn-sm" onclick="imprimirTodosPendentes()" id="btn-print-all" style="display:none">🏷️ Etiquetas pendentes</button>
+        </div>
+        <div id="ped-list"></div>
+        <div id="ped-empty" class="empty" style="display:none"><div class="ei">🧾</div><div class="et">Nenhuma comanda aberta</div><div class="es">Toque em "+ Novo Pedido" para criar</div></div>
+      </div>
+      <div id="ped-pendentes" style="display:none">
+        <div id="pend-list"></div>
+        <div id="pend-empty" class="empty" style="display:none"><div class="ei">🟠</div><div class="et">Sem pendências</div><div class="es">Nenhuma comanda aguardando pagamento</div></div>
+      </div>
     </div>
 
     <!-- ESTOQUE -->
@@ -706,11 +719,41 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
   <div class="msh"><div class="mhan"></div>
     <div class="mhdr"><div class="mtit">Finalizar comanda</div><button class="btn btn-g btn-sm" onclick="closeModal('m-pgto')">Fechar</button></div>
     <div class="mbdy">
-      <div class="tbox" style="margin-bottom:14px"><span class="tbox-l">Total</span><span class="tbox-v" id="pgto-val">R$ 0,00</span></div>
-      <div class="fg"><label>Forma de pagamento</label>
-        <select id="pgto-forma"><option value="Pix">💚 Pix</option><option value="Dinheiro">💵 Dinheiro</option><option value="Crédito">💳 Crédito</option><option value="Débito">🏦 Débito</option></select>
+      <div class="tbox" style="margin-bottom:16px"><span class="tbox-l">Total</span><span class="tbox-v" id="pgto-val">R$ 0,00</span></div>
+      <div id="pgto-credito-box" style="display:none;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);border-radius:10px;padding:10px 13px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:12px;color:#93C5FD;font-weight:600">Crédito disponível</div>
+            <div style="font-size:11px;color:var(--b)">Deseja usar no pagamento?</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:16px;font-weight:700;color:#93C5FD;font-family:var(--mo)" id="pgto-credito-val">R$ 0,00</span>
+            <button onclick="usarCredito()" style="padding:5px 12px;border-radius:20px;background:var(--b);border:none;color:#fff;font-size:11px;font-weight:600;cursor:pointer">Usar</button>
+          </div>
+        </div>
       </div>
-      <button class="btn btn-p btn-bl" style="margin-top:12px" onclick="confirmarPgto()">✅ Confirmar e finalizar</button>
+      <div class="fg"><label>Forma de pagamento</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px" id="pgto-chips">
+          <button class="pgto-chip" onclick="selecionarPgto('Pix',this)">Pix</button>
+          <button class="pgto-chip" onclick="selecionarPgto('Dinheiro',this)">Dinheiro</button>
+          <button class="pgto-chip" onclick="selecionarPgto('Crédito',this)">Crédito</button>
+          <button class="pgto-chip" onclick="selecionarPgto('Débito',this)">Débito</button>
+        </div>
+        <input type="hidden" id="pgto-forma" value="">
+      </div>
+      <div class="fg"><label>Valor recebido (opcional)</label>
+        <input id="pgto-recebido" type="number" placeholder="Deixe em branco se exato" step="0.01" min="0" oninput="calcTroco()">
+      </div>
+      <div id="pgto-troco" style="display:none;padding:10px 13px;border-radius:10px;margin-bottom:12px;display:none;justify-content:space-between;align-items:center">
+        <span id="pgto-troco-label" style="font-size:13px;font-weight:600"></span>
+        <span id="pgto-troco-val" style="font-size:18px;font-weight:700;font-family:var(--mo)"></span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+        <button class="btn btn-p btn-bl" id="btn-finalizar-pgto" onclick="confirmarPgto('finalizar')">✅ Confirmar e finalizar</button>
+        <button class="btn btn-g btn-bl" id="btn-aguardar-pgto" onclick="confirmarPgto('aguardar')">📦 Pago — aguardando entrega</button>
+        <div id="pgto-ou" style="display:none;text-align:center;margin:4px 0;font-size:12px;color:var(--tx4)">— ou —</div>
+        <button class="btn btn-bl" id="btn-pendente-pgto" style="display:none;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#FCD34D;padding:12px" onclick="fecharPendente()">🟠 Fechar como pendente</button>
+      </div>
     </div>
   </div>
 </div>
@@ -767,6 +810,14 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
           <div><div style="font-size:10px;color:var(--tx4)">Total de comandas</div><div style="font-size:20px;font-weight:700;font-family:var(--mo)" id="m-cl-qtd">0</div></div>
           <div><div style="font-size:10px;color:var(--tx4)">Total gasto</div><div style="font-size:20px;font-weight:700;font-family:var(--mo);color:var(--g)" id="m-cl-total">R$ 0,00</div></div>
         </div>
+        <div id="m-cl-devendo" style="display:none;margin-top:10px;padding:10px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:9px">
+          <div style="font-size:10px;color:var(--a);font-weight:700;margin-bottom:4px">🟠 VALOR PENDENTE</div>
+          <div style="font-size:18px;font-weight:700;color:var(--a);font-family:var(--mo)"><span>R$ 0,00</span></div>
+        </div>
+        <div id="m-cl-credito" style="display:none;margin-top:10px;padding:10px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);border-radius:9px;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:12px;color:#93C5FD;font-weight:600">💙 Crédito disponível</div>
+          <div style="font-size:18px;font-weight:700;color:#93C5FD;font-family:var(--mo)" id="m-cl-credito-val">R$ 0,00</div>
+        </div>
       </div>
       <div id="m-cl-list"></div>
     </div>
@@ -782,6 +833,7 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
       <div class="fg"><label>Tipo</label><select id="cup-tipo"><option value="pct">Percentual (%)</option><option value="val">Valor fixo (R$)</option></select></div>
       <div class="fg"><label>Valor</label><input id="cup-val" type="number" placeholder="0" min="0" step="0.01"></div>
       <div class="fg"><label>Limite de usos (0 = ilimitado)</label><input id="cup-lim" type="number" placeholder="0" min="0"></div>
+      <div class="fg"><label>Comissão % (opcional — 0 = sem comissão)</label><input id="cup-comm" type="number" placeholder="0" min="0" max="100" step="0.5"></div>
       <button class="btn btn-p btn-bl" style="margin-top:10px" onclick="salvarCupom()" id="btn-cup">Criar cupom</button>
     </div>
   </div>
@@ -1374,14 +1426,65 @@ function renderDash(){
 // PEDIDOS
 // ══════════════════════════════════════
 var _pedItems=[],_editPedId=null;
+var _pedTabAtual='abertos';
+
+function pedTab(t,el){
+  _pedTabAtual=t;
+  document.getElementById('ped-abertos').style.display=t==='abertos'?'block':'none';
+  document.getElementById('ped-pendentes').style.display=t==='pendentes'?'block':'none';
+  document.querySelectorAll('#sc-pedidos .tbb').forEach(b=>b.classList.remove('active'));
+  if(el)el.classList.add('active');
+  renderPedidos();
+}
 
 function parseItens(itens){if(!itens)return[];if(typeof itens==='string'){try{return JSON.parse(itens)}catch(e){return[]}}return itens}
 
 function renderPedidos(){
   var myPeds=can('verTodos')?pedidos:pedidos.filter(p=>String(p.vendedor_id)===String(me.id));
+  // pendentes = historico nao pago
+  var pendentes=historico.filter(p=>p.pendente==true||p.pendente==='true');
+  var myPend=can('verTodos')?pendentes:pendentes.filter(p=>String(p.vendedor_id)===String(me.id));
+  // atualizar badge pendentes
+  var bp=document.getElementById('badge-pend');
+  if(bp){bp.textContent=myPend.length;bp.style.display=myPend.length?'inline':'none'}
+  // renderizar aba pendentes
+  var pl=document.getElementById('pend-list'),pe=document.getElementById('pend-empty');
+  if(pl){
+    if(!myPend.length){pl.innerHTML='';if(pe)pe.style.display='block'}
+    else{
+      if(pe)pe.style.display='none';
+      pl.innerHTML=myPend.map(p=>{
+        var its=parseItens(p.itens);
+        var cl=clientes.find(c=>String(c.id)===String(p.cliente_id));
+        var nome=cl?cl.nome:'Sem cliente';
+        var total=parseFloat(p.total_editado||p.total)||0;
+        var ts=p.finalizado_em||p.criado_em;
+        var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||ts);
+        var data=isNaN(d)?'':d.toLocaleDateString('pt-BR');
+        return`<div class="card" style="border:1px solid rgba(245,158,11,.4);background:rgba(245,158,11,.05)">
+          <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--a),transparent)"></div>
+          <div class="ch">
+            <div>
+              <div class="ct">#${String(p.id).slice(-6)} — ${nome}</div>
+              <div class="cs">${p.tipo==='Entrega'?'🛵':'🏠'} ${p.tipo} · ${data}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:18px;font-weight:700;color:var(--a);font-family:var(--mo)">${fmt(total)}</div>
+              <span class="b ba">🟠 Devendo</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin:7px 0">
+            ${its.slice(0,4).map(it=>`<span class="chip">${it.qtd}x ${it.nome}</span>`).join('')}
+          </div>
+          <button class="btn btn-bl" style="margin-top:8px;background:rgba(245,158,11,.2);border:1px solid rgba(245,158,11,.4);color:#FCD34D;font-weight:700" onclick="pagarPendente('${p.id}')">💰 Registrar pagamento</button>
+        </div>`;
+      }).join('');
+    }
+  }
+  // renderizar aba abertos
   var l=document.getElementById('ped-list'),e=document.getElementById('ped-empty');
-  if(!myPeds.length){l.innerHTML='';e.style.display='block';return}
-  e.style.display='none';
+  if(!myPeds.length){if(l)l.innerHTML='';if(e)e.style.display='block';return}
+  if(e)e.style.display='none';
   l.innerHTML=myPeds.map(p=>{
     var its=parseItens(p.itens);
     var cl=clientes.find(c=>String(c.id)===String(p.cliente_id));
@@ -1532,19 +1635,199 @@ function abrirPgto(id){
   if(!can('pagarPed')){toast('Sem permissão','err');return}
   var p=pedidos.find(x=>String(x.id)===String(id));if(!p)return;
   window._pgtoId=id;
-  document.getElementById('pgto-val').textContent=fmt(p.total_editado||p.total);
-  if(p.pgto)document.getElementById('pgto-forma').value=p.pgto;
+  window._pgtoTotal=parseFloat(p.total_editado||p.total)||0;
+  window._creditoUsado=false;
+  document.getElementById('pgto-val').textContent=fmt(window._pgtoTotal);
+  document.getElementById('pgto-forma').value='';
+  document.getElementById('pgto-recebido').value='';
+  document.querySelectorAll('.pgto-chip').forEach(c=>c.classList.remove('active'));
+  var tr=document.getElementById('pgto-troco');if(tr)tr.style.display='none';
+  // verificar credito do cliente
+  var cl=p.cliente_id?clientes.find(c=>String(c.id)===String(p.cliente_id)):null;
+  var credito=cl&&parseFloat(cl.credito)||0;
+  var boxCred=document.getElementById('pgto-credito-box');
+  if(boxCred){
+    if(credito>0){
+      boxCred.style.display='block';
+      document.getElementById('pgto-credito-val').textContent=fmt(credito);
+      window._creditoDisp=credito;
+      window._clienteId=p.cliente_id;
+    }else{
+      boxCred.style.display='none';
+      window._creditoDisp=0;
+    }
+  }
+  atualizarBotoesPgto();
   openModal('m-pgto');
 }
 
-function confirmarPgto(){
+function usarCredito(){
+  var total=window._pgtoTotal||0;
+  var credito=window._creditoDisp||0;
+  if(!credito){return}
+  window._creditoUsado=true;
+  var abatido=Math.min(credito,total);
+  var restante=total-abatido;
+  var sobra=credito-abatido;
+  // mostrar credito aplicado
+  var boxCred=document.getElementById('pgto-credito-box');
+  if(boxCred){
+    boxCred.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:12px;color:#93C5FD;font-weight:600">Crédito aplicado</span>
+        <span style="font-size:15px;font-weight:700;color:#93C5FD;font-family:var(--mo)">- ${fmt(abatido)}</span>
+      </div>
+      ${sobra>0?`<div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;color:var(--b)">Saldo restante do crédito</span>
+        <span style="font-size:13px;font-weight:600;color:var(--b);font-family:var(--mo)">${fmt(sobra)}</span>
+      </div>`:''}
+      <button onclick="cancelarCredito()" style="margin-top:8px;background:none;border:none;color:var(--tx4);font-size:11px;cursor:pointer;text-decoration:underline">Cancelar uso do crédito</button>
+    `;
+  }
+  window._creditoAbatido=abatido;
+  window._creditoSobra=sobra;
+  // atualizar total a pagar
+  document.getElementById('pgto-val').textContent=fmt(restante);
+  window._pgtoTotalComCredito=restante;
+  if(restante===0){
+    // credito cobre tudo - nao precisa forma de pagamento
+    document.getElementById('pgto-forma').value='Crédito';
+    document.querySelectorAll('.pgto-chip').forEach(c=>c.classList.remove('active'));
+  }
+  atualizarBotoesPgto();
+}
+
+function cancelarCredito(){
+  window._creditoUsado=false;
+  window._creditoAbatido=0;
+  window._creditoTotalComCredito=0;
+  document.getElementById('pgto-val').textContent=fmt(window._pgtoTotal);
+  var cl=window._clienteId?clientes.find(c=>String(c.id)===String(window._clienteId)):null;
+  var credito=cl&&parseFloat(cl.credito)||0;
+  var boxCred=document.getElementById('pgto-credito-box');
+  if(boxCred){
+    boxCred.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:12px;color:#93C5FD;font-weight:600">Crédito disponível</div>
+          <div style="font-size:11px;color:var(--b)">Deseja usar no pagamento?</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:16px;font-weight:700;color:#93C5FD;font-family:var(--mo)" id="pgto-credito-val">${fmt(credito)}</span>
+          <button onclick="usarCredito()" style="padding:5px 12px;border-radius:20px;background:var(--b);border:none;color:#fff;font-size:11px;font-weight:600;cursor:pointer">Usar</button>
+        </div>
+      </div>
+    `;
+  }
+  document.getElementById('pgto-forma').value='';
+  document.querySelectorAll('.pgto-chip').forEach(c=>c.classList.remove('active'));
+  atualizarBotoesPgto();
+}
+
+function selecionarPgto(forma, el){
+  document.getElementById('pgto-forma').value=forma;
+  document.querySelectorAll('.pgto-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  calcTroco();
+}
+
+function calcTroco(){
+  var total=window._pgtoTotal||0;
+  var recebido=parseFloat(document.getElementById('pgto-recebido').value)||0;
+  var tr=document.getElementById('pgto-troco');
+  var trLabel=document.getElementById('pgto-troco-label');
+  var trVal=document.getElementById('pgto-troco-val');
+  if(recebido>0){
+    var diff=recebido-total;
+    tr.style.display='flex';
+    if(diff>0){
+      // troco - crédito
+      tr.style.background='rgba(59,130,246,.12)';
+      tr.style.border='1px solid rgba(59,130,246,.3)';
+      trLabel.style.color='#93C5FD';trLabel.textContent='Crédito do cliente';
+      trVal.style.color='#93C5FD';trVal.textContent=fmt(diff);
+    }else if(diff<0){
+      // falta
+      tr.style.background='rgba(245,158,11,.12)';
+      tr.style.border='1px solid rgba(245,158,11,.3)';
+      trLabel.style.color='#FCD34D';trLabel.textContent='Falta pagar';
+      trVal.style.color='#FCD34D';trVal.textContent=fmt(Math.abs(diff));
+    }else{
+      tr.style.display='none';
+    }
+  }else{
+    tr.style.display='none';
+  }
+  atualizarBotoesPgto();
+}
+
+function atualizarBotoesPgto(){
+  var forma=document.getElementById('pgto-forma').value;
+  var total=window._pgtoTotal||0;
+  var recebido=parseFloat(document.getElementById('pgto-recebido').value)||0;
+  var falta=recebido>0&&recebido<total;
+  var semForma=!forma;
+  var mostrarPendente=semForma||falta;
+  var btnFin=document.getElementById('btn-finalizar-pgto');
+  var btnAg=document.getElementById('btn-aguardar-pgto');
+  var btnPend=document.getElementById('btn-pendente-pgto');
+  var ou=document.getElementById('pgto-ou');
+  if(btnFin){btnFin.style.opacity=semForma?'.4':'1';btnFin.style.cursor=semForma?'not-allowed':'pointer'}
+  if(btnAg){btnAg.style.opacity=semForma?'.4':'1';btnAg.style.cursor=semForma?'not-allowed':'pointer'}
+  if(btnPend)btnPend.style.display=mostrarPendente?'block':'none';
+  if(ou)ou.style.display=mostrarPendente?'block':'none';
+}
+
+function confirmarPgto(modo){
+  var forma=document.getElementById('pgto-forma').value;
+  // pagar uma pendencia do historico
+  if(window._pgtoFromHist){
+    if(!forma){toast('Selecione a forma de pagamento','err');return}
+    var h=historico.find(x=>String(x.id)===String(window._pgtoId));
+    if(h){
+      h.pago=true;h.pgto=forma;h.pendente=false;
+      dbSave('historico',h);
+      toast('Pagamento confirmado! ✅','ok');
+    }
+    window._pgtoFromHist=false;
+    closeModal('m-pgto');
+    renderAll();
+    return;
+  }
+  if(!forma){toast('Selecione a forma de pagamento','err');return}
   var p=pedidos.find(x=>String(x.id)===String(window._pgtoId));if(!p)return;
+  p.pgto=forma;
   p.pago=true;
-  p.pgto=document.getElementById('pgto-forma').value;
-  p.entregue=true;
+  var recebido=parseFloat(document.getElementById('pgto-recebido').value)||0;
+  if(recebido>0){p.valor_recebido=recebido;p.troco=recebido-(window._pgtoTotal||p.total)}
+  // atualizar credito do cliente
+  if(window._creditoUsado&&window._clienteId){
+    var cl=clientes.find(c=>String(c.id)===String(window._clienteId));
+    if(cl){
+      var novoCredito=(parseFloat(cl.credito)||0)-(window._creditoAbatido||0);
+      // se teve troco vira credito novo
+      var trocoNovo=recebido>0?Math.max(0,recebido-(window._pgtoTotalComCredito||0)):0;
+      cl.credito=Math.max(0,novoCredito)+trocoNovo;
+      dbSave('clientes',cl);
+    }
+  }else if(recebido>0){
+    // troco vira credito se cliente cadastrado
+    var trocoVal=recebido-(window._pgtoTotal||p.total);
+    if(trocoVal>0&&p.cliente_id){
+      var cl2=clientes.find(c=>String(c.id)===String(p.cliente_id));
+      if(cl2){cl2.credito=(parseFloat(cl2.credito)||0)+trocoVal;dbSave('clientes',cl2)}
+    }
+  }
   closeModal('m-pgto');
-  // finalizar direto — vai para historico
-  moverHistorico(p);
+  if(modo==='finalizar'){
+    p.entregue=true;
+    moverHistorico(p);
+  }else if(modo==='aguardar'){
+    p.entregue=false;
+    dbSave('pedidos',{...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(p.itens)});
+    toast('Pago! Aguardando entrega 📦','ok');
+    renderAll();
+  }
 }
 
 function verificarEstoque(p){
@@ -1561,6 +1844,41 @@ function verificarEstoque(p){
     }
   });
   return falta;
+}
+
+function fecharPendente(){
+  var p=pedidos.find(x=>String(x.id)===String(window._pgtoId));if(!p)return;
+  p.pendente=true;
+  p.entregue=true;
+  p.pago=false;
+  p.finalizado_em=Date.now();
+  // salvar no historico como pendente E manter nos pedidos pendentes
+  var hr={...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(parseItens(p.itens)),pendente:true,finalizado_em:Date.now()};
+  delete hr._local;
+  dbSave('historico',hr);
+  dbDelete('pedidos',p.id);
+  historico.unshift(hr);
+  pedidos=pedidos.filter(x=>String(x.id)!==String(p.id));
+  if(empresa){
+    var cache=LS.g('data_'+empresa.id)||{};
+    cache.historico=historico;
+    cache.pedidos=pedidos;
+    LS.s('data_'+empresa.id,cache);
+  }
+  toast('Fechado como pendente 🟠','warn');
+  closeModal('m-pgto');
+  renderAll();
+  // mudar para aba pendentes
+  var tabPend=document.getElementById('tab-pendentes');
+  if(tabPend)pedTab('pendentes',tabPend);
+}
+
+function pagarPendente(id){
+  var p=historico.find(x=>String(x.id)===String(id));if(!p)return;
+  window._pgtoId=id;
+  window._pgtoFromHist=true;
+  document.getElementById('pgto-val').textContent=fmt(p.total_editado||p.total);
+  openModal('m-pgto');
 }
 
 function moverHistorico(p){
@@ -1925,19 +2243,61 @@ function gerarRel(){
   var totalDesp=despPeriod.reduce((a,d)=>a+(parseFloat(d.valor)||0),0);
   var totalEnt=entPeriod.reduce((a,e)=>a+(parseFloat(e.valor)||0),0);
   var liquido=total+totalEnt-totalDesp;
-  document.getElementById('rel-body').innerHTML=`
-    <div class="tr"><span class="tr-l">Período</span><span>${relPeriod==='custom'?de+' a '+ate:relPeriod}</span></div>
-    <div class="tr"><span class="tr-l">Pedidos</span><span>${dados.length}</span></div>
-    <div class="tr"><span class="tr-l">Ticket médio</span><span class="tr-v">${fmt(dados.length?total/dados.length:0)}</span></div>
-    <div class="tr"><span class="tr-l">Vendedor</span><span>${vendNome}</span></div>
-    ${cup?`<div class="tr"><span class="tr-l">Cupom</span><span class="b bp">${cup}</span></div>`:''}
-    <div class="div"></div>
-    <div class="tr"><span class="tr-l">Fat. bruto (vendas)</span><span class="tr-v" style="color:var(--g)">${fmt(total)}</span></div>
-    <div class="tr"><span class="tr-l">+ Entradas extras</span><span class="tr-v" style="color:var(--g)">${fmt(totalEnt)}</span></div>
-    <div class="tr"><span class="tr-l">- Despesas</span><span class="tr-v" style="color:var(--r3)">${fmt(totalDesp)}</span></div>
-    <div class="tbox"><span class="tbox-l">Fat. líquido</span><span class="tbox-v">${fmt(liquido)}</span></div>
-    ${commHtml}`;
-  document.getElementById('rel-res').style.display='block';toast('Relatório gerado! 📊');
+  // calcular comissao do cupom se filtrado
+  var cupCommHtml='';
+  if(cup){
+    var cupObj=cupons.find(c=>c.codigo===cup);
+    if(cupObj&&parseFloat(cupObj.comissao)>0){
+      var totalDesc=dados.reduce((a,p)=>{
+        var its=parseItens(p.itens);
+        var desc=its.filter(it=>it.cupom===cup).reduce((s,it)=>{
+          var pUnit=parseFloat(it.precoUnit||0);
+          var pFinal=parseFloat(it.precoFinal||0);
+          return s+(pUnit-pFinal)*(parseInt(it.qtd)||1);
+        },0);
+        return a+desc;
+      },0);
+      var commCup=total*(parseFloat(cupObj.comissao)/100);
+      cupCommHtml=`<div class="comm-card" style="margin-top:8px">
+        <div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:6px">🎟️ Comissão do cupom ${cup} (${cupObj.comissao}%)</div>
+        <div class="fr">
+          <div><div style="font-size:10px;color:rgba(255,255,255,.5)">Desconto dado</div><div style="font-size:15px;font-weight:700;font-family:var(--mo);color:#FCD34D">${fmt(totalDesc)}</div></div>
+          <div><div style="font-size:10px;color:rgba(255,255,255,.5)">Comissão a pagar</div><div style="font-size:15px;font-weight:700;font-family:var(--mo);color:#FCD34D">${fmt(commCup)}</div></div>
+        </div>
+      </div>`;
+    }
+  }
+
+  // montar relatorio de acordo com filtros
+  var bodyHtml='';
+  bodyHtml+=`<div class="tr"><span class="tr-l">Período</span><span>${relPeriod==='custom'?de+' a '+ate:relPeriod}</span></div>`;
+  bodyHtml+=`<div class="tr"><span class="tr-l">Total de pedidos</span><span>${dados.length}</span></div>`;
+  bodyHtml+='<div class="div"></div>';
+
+  if(cup){
+    // relatorio por cupom - sem ticket medio, entradas, despesas
+    bodyHtml+=`<div class="tr"><span class="tr-l">Cupom</span><span class="b bp">${cup}</span></div>`;
+    bodyHtml+=`<div class="tr"><span class="tr-l">Usos no período</span><span>${dados.length}</span></div>`;
+    bodyHtml+=`<div class="tbox"><span class="tbox-l">Total com cupom</span><span class="tbox-v">${fmt(total)}</span></div>`;
+    bodyHtml+=cupCommHtml;
+  } else if(vend){
+    // relatorio por vendedor - so comissao
+    bodyHtml+=`<div class="tr"><span class="tr-l">Vendedor</span><span>${vendNome}</span></div>`;
+    bodyHtml+=`<div class="tbox"><span class="tbox-l">Total vendido</span><span class="tbox-v">${fmt(total)}</span></div>`;
+    bodyHtml+=commHtml;
+  } else {
+    // relatorio geral - tudo
+    bodyHtml+=`<div class="tr"><span class="tr-l">Ticket médio</span><span class="tr-v">${fmt(dados.length?total/dados.length:0)}</span></div>`;
+    bodyHtml+='<div class="div"></div>';
+    bodyHtml+=`<div class="tr"><span class="tr-l">Fat. bruto (vendas)</span><span class="tr-v" style="color:var(--g)">${fmt(total)}</span></div>`;
+    bodyHtml+=`<div class="tr"><span class="tr-l">+ Entradas extras</span><span class="tr-v" style="color:var(--g)">${fmt(totalEnt)}</span></div>`;
+    bodyHtml+=`<div class="tr"><span class="tr-l">- Despesas</span><span class="tr-v" style="color:var(--r3)">${fmt(totalDesp)}</span></div>`;
+    bodyHtml+=`<div class="tbox"><span class="tbox-l">Fat. líquido</span><span class="tbox-v">${fmt(liquido)}</span></div>`;
+  }
+
+  document.getElementById('rel-body').innerHTML=bodyHtml;
+  document.getElementById('rel-res').style.display='block';
+  toast('Relatório gerado! 📊');
 }
 
 // ══════════════════════════════════════
@@ -1988,20 +2348,37 @@ function renderClientes(){
         var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||ts);
         ultData=isNaN(d)?'':d.toLocaleDateString('pt-BR');
       }
-      return`<div class="card" style="cursor:pointer" onclick="verHistCliente('${cid}')">
-        <div class="card-accent"></div>
+      var temPendente=orders.some(o=>o.pendente==true||o.pendente==='true');
+      var totPend=orders.filter(o=>o.pendente==true||o.pendente==='true').reduce((a,o)=>a+(parseFloat(o.total_editado||o.total)||0),0);
+      var clObj=clientes.find(c=>String(c.id)===String(cid));
+      var credCl2=clObj&&parseFloat(clObj.credito)||0;
+      var borderColor=temPendente?'rgba(245,158,11,.5)':credCl2>0?'rgba(59,130,246,.35)':'';
+      var bgColor=temPendente?'rgba(245,158,11,.04)':'';
+      var accentColor=temPendente?'var(--a)':credCl2>0?'var(--b)':'var(--r)';
+      var avBg=temPendente?'background:linear-gradient(135deg,#92400e,var(--a))':credCl2>0?'background:linear-gradient(135deg,var(--b),#185FA5)':'';
+      return`<div class="card" style="cursor:pointer;${borderColor?'border:1px solid '+borderColor+';':''} ${bgColor?'background:'+bgColor+';':''}" onclick="verHistCliente('${cid}')">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,${accentColor},transparent)"></div>
         <div class="ch">
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="av" style="width:38px;height:38px;font-size:13px">${ini(nome)}</div>
-            <div><div class="ct">${nome}</div><div class="cs">${orders.length} comanda(s)${ultData?' · último: '+ultData:''}</div></div>
+            <div class="av" style="width:38px;height:38px;font-size:13px;${avBg}">${ini(nome)}</div>
+            <div>
+              <div class="ct">${nome}</div>
+              <div class="cs">${orders.length} comanda(s)${ultData?' · último: '+ultData:''}</div>
+              ${temPendente?`<span class="b ba" style="margin-top:3px">🟠 Devendo ${fmt(totPend)}</span>`:''}
+              ${credCl2>0&&!temPendente?`<span class="b bb" style="margin-top:3px">💙 Crédito ${fmt(credCl2)}</span>`:''}
+            </div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:17px;font-weight:700;color:var(--g);font-family:var(--mo)">${fmt(tot)}</div>
+            <div style="font-size:17px;font-weight:700;color:${temPendente?'var(--a)':credCl2>0?'var(--b)':'var(--g)'};font-family:var(--mo)">${fmt(tot)}</div>
             <div style="font-size:10px;color:var(--tx4)">total gasto</div>
           </div>
         </div>
+        ${credCl2>0&&!temPendente?`<div style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:9px;padding:7px 12px;margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;color:#93C5FD;font-weight:600">💙 Crédito disponível</span>
+          <span style="font-size:14px;font-weight:700;color:#93C5FD;font-family:var(--mo)">${fmt(credCl2)}</span>
+        </div>`:''}
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">
-          ${orders.slice(0,3).map(o=>`<span class="chip">#${String(o.id).slice(-6)} ${fmt(o.total_editado||o.total)}</span>`).join('')}
+          ${orders.slice(0,3).map(o=>`<span class="chip" style="${o.pendente==true||o.pendente==='true'?'border-color:rgba(245,158,11,.4);color:var(--a)':''}">#${String(o.id).slice(-6)} ${fmt(o.total_editado||o.total)}</span>`).join('')}
           ${orders.length>3?`<span class="chip">+${orders.length-3} mais</span>`:''}
         </div>
         <div style="font-size:10px;color:var(--tx4);margin-top:5px;text-align:right">Toque para ver histórico →</div>
@@ -2017,10 +2394,11 @@ function renderClientes(){
       cl2.innerHTML=clientes.map(c=>{
         var pedsCl=historico.filter(p=>String(p.cliente_id)===String(c.id));
         var totCl=pedsCl.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
-        return`<div class="card"><div class="card-accent"></div>
+        var credCl=parseFloat(c.credito)||0;
+        return`<div class="card" style="${credCl>0?'border:1px solid rgba(59,130,246,.35)':''}"><div class="card-accent"></div>
           <div class="ch">
             <div style="display:flex;align-items:center;gap:10px">
-              <div class="av" style="width:38px;height:38px;font-size:13px">${ini(c.nome)}</div>
+              <div class="av" style="width:38px;height:38px;font-size:13px;${credCl>0?'background:linear-gradient(135deg,var(--b),#185FA5)':''}">${ini(c.nome)}</div>
               <div><div class="ct">${c.nome}</div><div class="cs">${c.cpf_cnpj?c.cpf_cnpj+' · ':''}${c.telefone||''}</div>${c.endereco?`<div class="cs">${c.endereco}</div>`:''}</div>
             </div>
             <div style="text-align:right">
@@ -2028,6 +2406,10 @@ function renderClientes(){
               <div style="font-size:10px;color:var(--tx4)">${pedsCl.length} ped.</div>
             </div>
           </div>
+          ${credCl>0?`<div style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);border-radius:9px;padding:8px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:12px;color:#93C5FD;font-weight:600">💙 Crédito disponível</span>
+            <span style="font-size:15px;font-weight:700;color:#93C5FD;font-family:var(--mo)">${fmt(credCl)}</span>
+          </div>`:''}
           <div style="display:flex;gap:6px;margin-top:8px">
             ${c.telefone?`<button class="btn btn-s btn-sm" onclick="window.open('https://wa.me/55'+'${c.telefone}'.replace(/\D/g,''),'_blank')">📱 WhatsApp</button>`:''}
             <button class="btn btn-g btn-sm" onclick="verHistCliente('${c.id}')">📋 Histórico</button>
@@ -2049,8 +2431,22 @@ function verHistCliente(cid){
   if(cl&&cl.cpf_cnpj)info.push(cl.cpf_cnpj);
   if(cl&&cl.telefone)info.push(cl.telefone);
   document.getElementById('m-cl-info').textContent=info.join(' · ');
+  var totPago=pedsCl.filter(p=>!p.pendente||p.pendente===false||p.pendente==='false').reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
+  var totPend=pedsCl.filter(p=>p.pendente==true||p.pendente==='true').reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
+  // mostrar credito no modal
+  var clObjH=clientes.find(c=>String(c.id)===String(cid));
+  var credH=clObjH&&parseFloat(clObjH.credito)||0;
+  var credBox=document.getElementById('m-cl-credito');
+  if(credBox){
+    credBox.style.display=credH>0?'block':'none';
+    var credValEl=document.getElementById('m-cl-credito-val');
+    if(credValEl)credValEl.textContent=fmt(credH);
+  }
   document.getElementById('m-cl-qtd').textContent=pedsCl.length;
   document.getElementById('m-cl-total').textContent=fmt(tot);
+  // mostrar devendo se tiver
+  var elDev=document.getElementById('m-cl-devendo');
+  if(elDev){elDev.style.display=totPend>0?'block':'none';elDev.querySelector('span').textContent=fmt(totPend)}
   var list=document.getElementById('m-cl-list');
   if(!pedsCl.length){
     list.innerHTML='<div class="empty"><div class="ei">📋</div><div class="et">Sem comandas finalizadas</div></div>';
@@ -2060,16 +2456,17 @@ function verHistCliente(cid){
       var ts=p.finalizado_em||p.criado_em;
       var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||ts);
       var data=isNaN(d)?'':d.toLocaleString('pt-BR');
-      return`<div class="card" style="cursor:pointer" onclick="showHistDet('${p.id}')">
-        <div class="card-accent"></div>
+      var isPend=p.pendente==true||p.pendente==='true';
+      return`<div class="card" style="cursor:pointer;${isPend?'border:1px solid rgba(245,158,11,.4);background:rgba(245,158,11,.05)':''}" onclick="showHistDet('${p.id}')">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,${isPend?'var(--a)':'var(--r)'},transparent)"></div>
         <div class="ch">
           <div>
             <div class="ct">#${String(p.id).slice(-6)} — ${p.tipo}</div>
             <div class="cs">${data}${p.pgto?' · '+p.pgto:''}${p.vendedor_nome?' · '+p.vendedor_nome:''}</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:16px;font-weight:700;color:var(--r3);font-family:var(--mo)">${fmt(p.total_editado||p.total)}</div>
-            <div style="font-size:10px;color:var(--tx4)">${its.length} item(ns)</div>
+            <div style="font-size:16px;font-weight:700;color:${isPend?'var(--a)':'var(--r3)'};font-family:var(--mo)">${fmt(p.total_editado||p.total)}</div>
+            ${isPend?'<span class="b ba">🟠 Devendo</span>':`<div style="font-size:10px;color:var(--tx4)">${its.length} item(ns)</div>`}
           </div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px">
@@ -2281,23 +2678,107 @@ function imprimirRecibo(){
 }
 
 function exportarRelPDF(){
-  var body=document.getElementById('rel-body');
-  if(!body||!body.innerHTML){toast('Gere o relatório primeiro','warn');return}
+  if(!document.getElementById('rel-res')||document.getElementById('rel-res').style.display==='none'){
+    toast('Gere o relatório primeiro','warn');return;
+  }
   var emp=empresa||{};
+  var tipo=document.getElementById('rel-tipo').value;
+  var pgto=document.getElementById('rel-pgto').value;
+  var cup=document.getElementById('rel-cup').value;
+  var vend=document.getElementById('rel-vend').value;
+  var de=document.getElementById('rel-de').value;
+  var ate=document.getElementById('rel-ate').value;
+  var dados=historico.filter(p=>{
+    var its=parseItens(p.itens);
+    if(!periodFilter(p.finalizado_em||p.criado_em,relPeriod,de,ate))return false;
+    if(tipo!=='Todos'&&p.tipo!==tipo)return false;
+    if(pgto!=='Todos'&&p.pgto!==pgto)return false;
+    if(cup&&!its.some(it=>it.cupom===cup))return false;
+    if(vend&&String(p.vendedor_id)!==String(vend))return false;
+    return true;
+  });
+  var total=dados.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
+  var vendObj=vend?users.find(u=>String(u.id)===String(vend)):null;
+  var cupObj=cup?cupons.find(c=>c.codigo===cup):null;
+  var comm=vendObj&&vendObj.comissao>0?total*vendObj.comissao/100:0;
+  var commCup=cupObj&&parseFloat(cupObj.comissao)>0?total*(parseFloat(cupObj.comissao)/100):0;
+
+  // montar linhas das comandas
+  var linhasComandas=dados.map(p=>{
+    var cl=clientes.find(c=>String(c.id)===String(p.cliente_id));
+    var ts=p.finalizado_em||p.criado_em;
+    var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||ts);
+    var data=isNaN(d)?'':d.toLocaleDateString('pt-BR');
+    return`<tr>
+      <td>#${String(p.id).slice(-6)}</td>
+      <td>${cl?cl.nome:'—'}</td>
+      <td>${data}</td>
+      <td>${p.tipo||'—'}</td>
+      <td>${p.pgto||'—'}</td>
+      <td style="text-align:right;font-weight:600">R$ ${parseFloat(p.total_editado||p.total||0).toFixed(2).replace('.',',')}</td>
+    </tr>`;
+  }).join('');
+
   var html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-    body{font-family:sans-serif;font-size:13px;color:#000;padding:30px;max-width:600px;margin:0 auto}
-    h1{font-size:20px;font-weight:700;margin-bottom:4px}
-    .sub{font-size:12px;color:#555;margin-bottom:20px}
-    .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;font-size:13px}
-    .row .label{color:#555}.row .val{font-weight:600}
-    .total{display:flex;justify-content:space-between;padding:12px;background:#f5f5f5;border-radius:6px;margin-top:10px;font-size:16px;font-weight:700}
-    .comm{background:#7F1D1D;color:#fff;padding:12px;border-radius:6px;margin-top:8px;display:flex;justify-content:space-between}
-    .footer{text-align:center;margin-top:30px;font-size:11px;color:#888;border-top:1px solid #ddd;padding-top:12px}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:sans-serif;font-size:12px;color:#000;padding:24px;max-width:700px;margin:0 auto}
+    .header{border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start}
+    .emp-name{font-size:18px;font-weight:700}
+    .emp-info{font-size:10px;color:#555;margin-top:3px;line-height:1.6}
+    .rel-title{text-align:right}
+    .rel-title h2{font-size:14px;font-weight:700}
+    .rel-title .sub{font-size:10px;color:#666}
+    .section{margin-bottom:16px}
+    .section-title{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #eee}
+    .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f5f5f5;font-size:12px}
+    .row .label{color:#555}
+    .row .val{font-weight:600}
+    .total-box{display:flex;justify-content:space-between;padding:10px 12px;background:#f5f5f5;border-radius:6px;font-size:15px;font-weight:700;margin-top:8px}
+    .comm-box{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#7F1D1D;color:#fff;border-radius:6px;margin-top:6px;font-size:13px;font-weight:700}
+    .comm-detail{font-size:10px;color:rgba(255,255,255,.7);margin-top:2px}
+    table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px}
+    thead tr{background:#f5f5f5}
+    th{padding:6px 8px;text-align:left;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.3px}
+    td{padding:5px 8px;border-bottom:1px solid #f0f0f0}
+    tr:last-child td{border-bottom:none}
+    .footer{text-align:center;margin-top:24px;font-size:10px;color:#888;border-top:1px solid #ddd;padding-top:10px}
+    @media print{body{padding:10px}}
   </style></head><body>
-    <h1>${emp.razao_social||emp.nome||'NS Estoque Pro'}</h1>
-    <div class="sub">Relatório gerado em ${new Date().toLocaleString('pt-BR')}</div>
-    ${body.innerHTML.replace(/class="tr"/g,'class="row"').replace(/class="tr-l"/g,'class="label"').replace(/class="tr-v"/g,'class="val"').replace(/class="tbox"/g,'class="total"').replace(/class="tbox-l"/g,'').replace(/class="tbox-v"/g,'').replace(/class="div"/g,'style="border-top:1px solid #ccc;margin:10px 0"').replace(/class="comm-card"/g,'class="comm"')}
-    ${emp.rodape?'<div class="footer">'+emp.rodape+'</div>':''}
+    <div class="header">
+      <div>
+        <div class="emp-name">${emp.razao_social||emp.nome||'NS Estoque Pro'}</div>
+        <div class="emp-info">
+          ${emp.cpf_cnpj?'CNPJ/CPF: '+emp.cpf_cnpj+'<br>':''}
+          ${emp.endereco?emp.endereco+'<br>':''}
+          ${emp.telefone||''}
+        </div>
+      </div>
+      <div class="rel-title">
+        <h2>RELATÓRIO</h2>
+        <div class="sub">${new Date().toLocaleString('pt-BR')}</div>
+        <div class="sub">Período: ${relPeriod==='custom'?de+' a '+ate:relPeriod}</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Resumo</div>
+      <div class="row"><span class="label">Total de pedidos</span><span class="val">${dados.length}</span></div>
+      ${cup?`<div class="row"><span class="label">Cupom</span><span class="val">${cup}</span></div>`:''}
+      ${vendObj?`<div class="row"><span class="label">Vendedor</span><span class="val">${vendObj.nome}</span></div>`:''}
+      <div class="total-box"><span>Total</span><span>R$ ${total.toFixed(2).replace('.',',')}</span></div>
+      ${comm>0?`<div class="comm-box"><div><div>Comissão ${vendObj.nome} (${vendObj.comissao}%)</div><div class="comm-detail">Baseado no total de vendas do período</div></div><div>R$ ${comm.toFixed(2).replace('.',',')}</div></div>`:''}
+      ${commCup>0?`<div class="comm-box"><div><div>Comissão cupom ${cup} (${cupObj.comissao}%)</div><div class="comm-detail">Baseado no total de vendas com o cupom</div></div><div>R$ ${commCup.toFixed(2).replace('.',',')}</div></div>`:''}
+    </div>
+
+    ${dados.length?`<div class="section">
+      <div class="section-title">Comandas (${dados.length})</div>
+      <table>
+        <thead><tr><th>#</th><th>Cliente</th><th>Data</th><th>Tipo</th><th>Pgto</th><th style="text-align:right">Total</th></tr></thead>
+        <tbody>${linhasComandas}</tbody>
+      </table>
+    </div>`:''}
+
+    ${emp.rodape?`<div class="footer">${emp.rodape}</div>`:''}
   </body></html>`;
   abrirJanelaPDF(html);
 }
@@ -2375,7 +2856,7 @@ function renderCupons(){
       <div class="cup-info">
         <div class="cup-code">${c.codigo}</div>
         <div class="cup-desc">${c.descricao}</div>
-        <div class="cup-meta">${c.tipo==='pct'?c.valor+'% off':'R$ '+fmtN(c.valor)+' off'} · ${c.usos||0} uso(s)${c.limite>0?' · lim: '+c.limite:''}</div>
+        <div class="cup-meta">${c.tipo==='pct'?c.valor+'% off':'R$ '+fmtN(c.valor)+' off'} · ${c.usos||0} uso(s)${c.limite>0?' · lim: '+c.limite:''}${c.comissao>0?' · comissão: '+c.comissao+'%':''}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:5px">
         <button class="btn btn-g btn-sm" onclick="editCupom('${c.id}')">✏️</button>
@@ -2388,7 +2869,7 @@ function abrirNovoCupom(){
   _editCupId=null;
   document.getElementById('m-cup-tit').textContent='Novo cupom';
   document.getElementById('btn-cup').textContent='Criar cupom';
-  ['cup-cod','cup-desc','cup-val','cup-lim'].forEach(id=>document.getElementById(id).value='');
+  ['cup-cod','cup-desc','cup-val','cup-lim','cup-comm'].forEach(id=>document.getElementById(id).value='');
   openModal('m-cupom');
 }
 
@@ -2402,6 +2883,7 @@ function editCupom(id){
   document.getElementById('cup-tipo').value=c.tipo;
   document.getElementById('cup-val').value=c.valor;
   document.getElementById('cup-lim').value=c.limite||0;
+  document.getElementById('cup-comm').value=c.comissao||0;
   openModal('m-cupom');
 }
 
@@ -2420,13 +2902,14 @@ function salvarCupom(){
   var lim=parseInt(document.getElementById('cup-lim').value)||0;
   if(!cod){toast('Informe o código','err');return}
   if(!val){toast('Informe o valor','err');return}
+  var comm=parseFloat(document.getElementById('cup-comm').value)||0;
   if(_editCupId){
     var c=cupons.find(x=>String(x.id)===String(_editCupId));
-    if(c){c.codigo=cod;c.descricao=desc;c.tipo=tipo;c.valor=val;c.limite=lim;dbSave('cupons',c)}
+    if(c){c.codigo=cod;c.descricao=desc;c.tipo=tipo;c.valor=val;c.limite=lim;c.comissao=comm;dbSave('cupons',c)}
     toast('Cupom atualizado! 🎟️','ok');
   }else{
     if(cupons.find(x=>x.codigo===cod)){toast('Código já existe','err');return}
-    var nc={id:uid(),empresa_id:empresa.id,codigo:cod,descricao:desc,tipo,valor:val,limite:lim,usos:0,ativo:true};
+    var nc={id:uid(),empresa_id:empresa.id,codigo:cod,descricao:desc,tipo,valor:val,limite:lim,comissao:comm,usos:0,ativo:true};
     cupons.push(nc);dbSave('cupons',nc);toast('Cupom criado! 🎟️','ok');
   }
   closeModal('m-cupom');renderCupons();renderAll();
