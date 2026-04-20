@@ -815,7 +815,7 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
           <div style="font-size:18px;font-weight:700;color:var(--a);font-family:var(--mo)"><span>R$ 0,00</span></div>
         </div>
         <div id="m-cl-credito" style="display:none;margin-top:10px;padding:10px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);border-radius:9px;display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:12px;color:#93C5FD;font-weight:600">💙 Crédito disponível</div>
+          <div style="font-size:12px;color:#93C5FD;font-weight:600">Crédito disponível</div>
           <div style="font-size:18px;font-weight:700;color:#93C5FD;font-family:var(--mo)" id="m-cl-credito-val">R$ 0,00</div>
         </div>
       </div>
@@ -1105,10 +1105,13 @@ function dbSave(table, data){
       method:'POST',
       headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
       body:JSON.stringify(empData)
+    }).then(r=>{
+      if(!r)console.warn('dbSave sem retorno',table);
     }).catch(e=>{
-      console.error('dbSave error',table,e);
-      // se falhar online, guardar na fila offline
+      console.error('dbSave ERRO',table,e);
+      // fallback - guardar na fila para sync posterior
       queueSync('upsert',table,empData);
+      toast('Salvo localmente — sincronizando...','warn');
     });
   }else{
     queueSync('upsert',table,empData);
@@ -1150,11 +1153,17 @@ async function syncNow(manual){
       sbFetch('despesas?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc')
     ]);
     users=u||[];produtos=p||[];clientes=cl||[];
-    var localPending=pedidos.filter(lp=>lp._local&&!ped.find(sp=>sp.id===lp.id));
     // filtrar pedidos que ja foram para o historico
     var histIds=new Set((his||[]).map(h=>String(h.id)));
     var pedFiltrados=(ped||[]).filter(p=>!histIds.has(String(p.id)));
-    pedidos=[...pedFiltrados,...localPending];
+    // manter pedidos locais que ainda nao chegaram ao banco
+    var localNovos=pedidos.filter(lp=>!pedFiltrados.find(sp=>String(sp.id)===String(lp.id))&&!histIds.has(String(lp.id)));
+    pedidos=[...pedFiltrados,...localNovos];
+    // re-enviar pedidos locais que nao chegaram ao banco
+    localNovos.forEach(p=>{
+      console.log('re-enviando pedido local:',p.id);
+      dbSave('pedidos',p);
+    });
     historico=his||[];cupons=cup||[];entradas=ent||[];despesas=desp||[];
     LS.s('data_'+eid,{users,produtos,clientes,pedidos,historico,cupons,entradas,despesas,ts:Date.now()});
     isOnline=true;
@@ -1614,8 +1623,10 @@ function salvarPedido(){
     dbSave('pedidos',{...p,itens:JSON.stringify(_pedItems)});
     toast('Comanda atualizada! ✓','ok');
   }else{
-    var np={id:uid(),empresa_id:empresa.id,cliente_id:cid||null,tipo,obs,itens:JSON.stringify(_pedItems),total:totalCalc,total_editado:totalEdit,entregue:false,pago:false,pgto:pgto||null,vendedor_id:me.id,vendedor_nome:me.nome,criado_em:Date.now(),_local:true};
+    var np={id:uid(),empresa_id:empresa.id,cliente_id:cid||null,tipo,obs,itens:JSON.stringify(_pedItems),total:totalCalc,total_editado:totalEdit,entregue:false,pago:false,pgto:pgto||null,vendedor_id:me.id,vendedor_nome:me.nome,criado_em:Date.now()};
     pedidos.unshift(np);
+    // salvar no cache local imediatamente
+    if(empresa){var cache=LS.g('data_'+empresa.id)||{};cache.pedidos=pedidos;LS.s('data_'+empresa.id,cache)}
     dbSave('pedidos',np);
     toast('Comanda criada! 🧾','ok');
   }
@@ -2365,7 +2376,7 @@ function renderClientes(){
               <div class="ct">${nome}</div>
               <div class="cs">${orders.length} comanda(s)${ultData?' · último: '+ultData:''}</div>
               ${temPendente?`<span class="b ba" style="margin-top:3px">🟠 Devendo ${fmt(totPend)}</span>`:''}
-              ${credCl2>0&&!temPendente?`<span class="b bb" style="margin-top:3px">💙 Crédito ${fmt(credCl2)}</span>`:''}
+              ${credCl2>0&&!temPendente?`<span class="b bb" style="margin-top:3px">Crédito ${fmt(credCl2)}</span>`:''}
             </div>
           </div>
           <div style="text-align:right">
@@ -2374,7 +2385,7 @@ function renderClientes(){
           </div>
         </div>
         ${credCl2>0&&!temPendente?`<div style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:9px;padding:7px 12px;margin-top:6px;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:11px;color:#93C5FD;font-weight:600">💙 Crédito disponível</span>
+          <span style="font-size:11px;color:#93C5FD;font-weight:600">Crédito disponível</span>
           <span style="font-size:14px;font-weight:700;color:#93C5FD;font-family:var(--mo)">${fmt(credCl2)}</span>
         </div>`:''}
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">
