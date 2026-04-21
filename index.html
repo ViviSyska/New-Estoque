@@ -176,6 +176,7 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
 /* ── PENDING SYNC ── */
 .pending-sync{border:1px solid var(--a) !important;position:relative}
 .pending-badge{position:absolute;top:10px;right:10px;background:var(--a);color:#000;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;font-family:var(--mo)}
+.pago-aguard{border:1px solid rgba(59,130,246,.5) !important;background:rgba(59,130,246,.06) !important}
 
 /* ── LOGIN ── */
 #lscr{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;overflow-y:auto}
@@ -446,7 +447,7 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
         <div class="metrics">
           <div class="met"><div class="met-ac" style="background:var(--g)"></div><div class="ml">Fat. bruto</div><div class="mv" style="color:var(--g)" id="cx-bruto">0,00</div><div class="ms">R$ vendas</div></div>
           <div class="met"><div class="met-ac" style="background:var(--b)"></div><div class="ml">Fat. líquido</div><div class="mv" style="color:var(--b)" id="cx-liq">0,00</div><div class="ms">R$ líquido</div></div>
-          <div class="met"><div class="met-ac" style="background:var(--g)"></div><div class="ml">Entradas</div><div class="mv" style="color:var(--g)" id="cx-ent-v">0,00</div><div class="ms">R$ total</div></div>
+          <div class="met"><div class="met-ac" style="background:var(--a)"></div><div class="ml">Pendentes</div><div class="mv" style="color:var(--a)" id="cx-ent-v">0,00</div><div class="ms">R$ devendo</div></div>
           <div class="met"><div class="met-ac" style="background:var(--r3)"></div><div class="ml">Despesas</div><div class="mv" style="color:var(--r3)" id="cx-desp-v">0,00</div><div class="ms">R$</div></div>
         </div>
         <div class="card"><div class="card-accent"></div><div class="ct" style="margin-bottom:10px">Saldo final</div>
@@ -749,10 +750,16 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
         <span id="pgto-troco-val" style="font-size:18px;font-weight:700;font-family:var(--mo)"></span>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
-        <button class="btn btn-p btn-bl" id="btn-finalizar-pgto" onclick="confirmarPgto('finalizar')">✅ Confirmar e finalizar</button>
-        <button class="btn btn-g btn-bl" id="btn-aguardar-pgto" onclick="confirmarPgto('aguardar')">📦 Pago — aguardando entrega</button>
-        <div id="pgto-ou" style="display:none;text-align:center;margin:4px 0;font-size:12px;color:var(--tx4)">— ou —</div>
-        <button class="btn btn-bl" id="btn-pendente-pgto" style="display:none;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#FCD34D;padding:12px" onclick="fecharPendente()">🟠 Fechar como pendente</button>
+        <button class="btn btn-p btn-bl" id="btn-finalizar-pgto" onclick="confirmarPgto('finalizar')" style="padding:13px">
+          ✅ Pagar e finalizar comanda
+        </button>
+        <button class="btn btn-bl" id="btn-aguardar-pgto" onclick="confirmarPgto('aguardar')" style="padding:13px;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.4);color:#93C5FD">
+          💳 Pagar — aguardar entrega
+        </button>
+        <div id="pgto-ou" style="text-align:center;margin:2px 0;font-size:12px;color:var(--tx4)">— ou —</div>
+        <button class="btn btn-bl" id="btn-pendente-pgto" onclick="fecharPendente()" style="padding:13px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#FCD34D">
+          🟠 Finalizar sem pagar (fiado)
+        </button>
       </div>
     </div>
   </div>
@@ -932,6 +939,54 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
   </div>
 </div>
 
+<!-- MODAL ESTOQUE INSUFICIENTE -->
+<div class="mov" id="m-sem-estoque">
+  <div class="msh"><div class="mhan"></div>
+    <div class="mhdr">
+      <div class="mtit">📦 Estoque insuficiente</div>
+      <button class="btn btn-g btn-sm" onclick="closeModal('m-sem-estoque')">Fechar</button>
+    </div>
+    <div class="mbdy">
+      <div style="background:rgba(185,28,28,.1);border:1px solid rgba(185,28,28,.3);border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">
+        <div style="font-size:28px;margin-bottom:8px">🚫</div>
+        <div style="font-size:14px;font-weight:700;color:#FCA5A5;margin-bottom:4px">Não é possível entregar</div>
+        <div style="font-size:12px;color:var(--tx3);line-height:1.6">Estoque insuficiente para os itens abaixo. Ajuste o estoque antes de marcar como entregue.</div>
+      </div>
+      <div id="m-sem-estoque-body" style="margin-bottom:16px"></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-p btn-bl" onclick="closeModal('m-sem-estoque');goTo('estoque',document.querySelectorAll('.nb')[2],'Estoque')" style="padding:13px">
+          📦 Ir para o estoque ajustar
+        </button>
+        <button class="btn btn-g btn-bl" onclick="closeModal('m-sem-estoque')" style="padding:12px">
+          ← Voltar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENTREGA SEM PAGAMENTO -->
+<div class="mov" id="m-entrega-sem-pgto">
+  <div class="msh"><div class="mhan"></div>
+    <div class="mhdr">
+      <div class="mtit">⚠️ Entrega sem pagamento</div>
+      <button class="btn btn-g btn-sm" onclick="closeModal('m-entrega-sem-pgto')">Fechar</button>
+    </div>
+    <div class="mbdy">
+      <div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:14px;margin-bottom:16px;text-align:center">
+        <div style="font-size:28px;margin-bottom:8px">🟠</div>
+        <div style="font-size:14px;font-weight:700;color:#FCD34D;margin-bottom:6px">Comanda ainda não foi paga!</div>
+        <div style="font-size:12px;color:var(--tx3);line-height:1.6">O que deseja fazer?</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-p btn-bl" onclick="entregaSemPgtoAcao('cobrar')" style="padding:14px">💰 Cobrar agora</button>
+        <button class="btn btn-bl" onclick="entregaSemPgtoAcao('fiado')" style="padding:14px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#FCD34D">🟠 Fiado — cobrar depois</button>
+        <button class="btn btn-g btn-bl" onclick="closeModal('m-entrega-sem-pgto')" style="padding:12px">← Voltar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- PRINT AREA (MODELO C) -->
 <div id="print-area"></div>
 
@@ -953,7 +1008,6 @@ const SB_HEADERS = {
 
 // 🔥 FETCH PADRÃO (TABELAS)
 async function sbFetch(path, opts = {}) {
-  // Isso vai forçar a chave diretamente na função, sem depender de variáveis externas
   const MINHA_CHAVE_FORCADA = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1dmxyYmZ2enJzcmN1dnNrbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NjMyNjUsImV4cCI6MjA5MjEzOTI2NX0.ZiXsiB2Ke4TtZMuI34R7_6Yq3MjIDVHrNepH-X9F5Io';
 
   try {
@@ -963,7 +1017,8 @@ async function sbFetch(path, opts = {}) {
         'apikey': MINHA_CHAVE_FORCADA,
         'Authorization': 'Bearer ' + MINHA_CHAVE_FORCADA,
         'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
+        'Prefer': 'return=representation',
+        ...(opts.headers||{})
       },
       body: opts.body
     });
@@ -1045,6 +1100,7 @@ var LS={
 };
 
 function uid(){return Date.now()+''+Math.floor(Math.random()*9999)}
+function isTrue(v){return v===true||v==='true'||v===1||v==='1'}
 
 // ══════════════════════════════════════
 // PERMISSIONS
@@ -1212,7 +1268,23 @@ async function syncNow(manual){
       sbFetch('entradas?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc'),
       sbFetch('despesas?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc')
     ]);
-    users=u||[];produtos=p||[];clientes=cl||[];
+    users=u||[];
+    // para cada tabela: manter itens locais que ainda não chegaram ao banco e reenviar
+    function mergeEReenviar(remoto, local, tabela){
+      var remotos=remoto||[];
+      var remotosIds=new Set(remotos.map(x=>String(x.id)));
+      var somenteLocais=local.filter(x=>!remotosIds.has(String(x.id)));
+      somenteLocais.forEach(x=>{
+        console.log('re-enviando local:',tabela,x.id);
+        dbSave(tabela,x);
+      });
+      return [...remotos,...somenteLocais];
+    }
+    produtos  = mergeEReenviar(p,   produtos,   'produtos');
+    clientes  = mergeEReenviar(cl,  clientes,   'clientes');
+    cupons    = mergeEReenviar(cup, cupons,     'cupons');
+    entradas  = mergeEReenviar(ent, entradas,   'entradas');
+    despesas  = mergeEReenviar(desp,despesas,   'despesas');
     // filtrar pedidos que ja foram para o historico
     var histIds=new Set((his||[]).map(h=>String(h.id)));
     var pedFiltrados=(ped||[]).filter(p=>!histIds.has(String(p.id)));
@@ -1224,7 +1296,7 @@ async function syncNow(manual){
       console.log('re-enviando pedido local:',p.id);
       dbSave('pedidos',p);
     });
-    historico=his||[];cupons=cup||[];entradas=ent||[];despesas=desp||[];
+    historico=his||[];
     LS.s('data_'+eid,{users,produtos,clientes,pedidos,historico,cupons,entradas,despesas,ts:Date.now()});
     isOnline=true;
     setDot('online');
@@ -1561,7 +1633,9 @@ function renderPedidos(){
     var isPending=p._pending===true&&!isOnline;
     var totalShow=parseFloat(p.total_editado)||parseFloat(p.total)||0;
     if(!totalShow){var its2=parseItens(p.itens);totalShow=its2.reduce((a,i)=>a+(parseFloat(i.total)||0),0)}
-    return`<div class="card${isPending?' pending-sync':''}">
+    // verificar estoque para feedback visual no botão
+    var semEstoque=!isTrue(p.entregue)&&verificarEstoque(p).length>0;
+    return`<div class="card${isPending?' pending-sync':''}${isTrue(p.pago)&&!isTrue(p.entregue)?' pago-aguard':''}">
       ${isPending?'<div class="pending-badge">🔄 Sync pendente</div>':''}
       <div class="card-accent"></div>
       <div class="ch">
@@ -1573,13 +1647,17 @@ function renderPedidos(){
         ${its.length>4?`<span class="chip">+${its.length-4}</span>`:''}
       </div>
       <div class="str">
-        <button class="stg ${(p.entregue==true||p.entregue=='true')?'sd':''}" onclick="${can('editPed')?'toggleEnt(\''+p.id+'\')':''}">
-          ${(p.entregue==true||p.entregue=='true')?'✓ Entregue':'○ Entregar'}
+        <button class="stg ${isTrue(p.entregue)?'sd':semEstoque?'sw':''}" ${can('editPed')?`onclick="toggleEnt('${p.id}')"`:''} ${semEstoque?'title="Estoque insuficiente"':''}>
+          ${isTrue(p.entregue)?'✓ Entregue':semEstoque?'⚠️ Sem estoque':'○ Entregar'}
         </button>
-        <button class="stg ${(p.pago==true||p.pago=='true')?'sp':''}" onclick="abrirPgto('${p.id}')">
-          ${(p.pago==true||p.pago=='true')?'✓ Pago':'○ Pagar / Finalizar'}
+        <button class="stg ${isTrue(p.pago)?'sp':''}" onclick="abrirPgto('${p.id}')">
+          ${isTrue(p.pago)?'✓ Pago':'○ Pagar'}
         </button>
       </div>
+      ${semEstoque?`<div style="font-size:11px;color:var(--a);margin-top:6px;text-align:center">⚠️ Estoque insuficiente — ajuste antes de entregar</div>`:''}
+      ${isTrue(p.pago)&&!isTrue(p.entregue)&&!semEstoque?`<div style="font-size:11px;color:#93C5FD;margin-top:6px;text-align:center">💳 Pago — aguardando entrega</div>`:
+        isTrue(p.entregue)&&!isTrue(p.pago)?`<div style="font-size:11px;color:#6EE7B7;margin-top:6px;text-align:center">📦 Entregue — aguardando pagamento</div>`:''
+      }
       ${can('editPed')?`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
         <button class="btn btn-g btn-sm" onclick="editarPedido('${p.id}')">✏️ Editar</button>
         <button class="btn btn-g btn-sm" onclick="emitirReciboPed('${p.id}')">🧾 Recibo</button>
@@ -1693,29 +1771,97 @@ function salvarPedido(){
   closeModal('m-pedido');renderAll();
 }
 
+function descontarEstoque(p){
+  var its=parseItens(p.itens);
+  its.forEach(it=>{
+    var prod=produtos.find(x=>String(x.id)===String(it.prodId||it.id||''));
+    if(prod){
+      prod.qtd=Math.max(0,(parseInt(prod.qtd)||0)-(parseInt(it.qtd)||1));
+      dbSave('produtos',prod);
+    }
+  });
+}
+
+function salvarPedidoCache(p){
+  if(!empresa)return;
+  var cache=LS.g('data_'+empresa.id)||{};
+  cache.pedidos=cache.pedidos||[];
+  var idx=cache.pedidos.findIndex(x=>String(x.id)===String(p.id));
+  var pedData={...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(p.itens)};
+  if(idx>=0)cache.pedidos[idx]=pedData; else cache.pedidos.unshift(pedData);
+  LS.s('data_'+empresa.id,cache);
+}
+
 function toggleEnt(id){
   if(!can('editPed')){toast('Sem permissão','err');return}
-  var p=pedidos.find(x=>String(x.id)===String(id));if(!p)return;
-  p.entregue=!(p.entregue==true||p.entregue=='true');
-  var pedData={...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(p.itens)};
-  // salvar no cache local imediatamente para persistir ao recarregar
-  if(empresa){
-    var cache=LS.g('data_'+empresa.id)||{};
-    if(cache.pedidos){
-      var idx=cache.pedidos.findIndex(x=>String(x.id)===String(id));
-      if(idx>=0)cache.pedidos[idx]=pedData;
-    }
-    LS.s('data_'+empresa.id,cache);
-    idbSalvar('data_'+empresa.id,cache).catch(()=>{});
+  var p=pedidos.find(x=>String(x.id)===String(id));
+  if(!p)return;
+
+  // desmarcando entrega
+  if(isTrue(p.entregue)){
+    p.entregue=false;
+    salvarPedidoCache(p);
+    dbSave('pedidos',{...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(p.itens)});
+    toast('Desmarcado');renderPedidos();updBadge();
+    return;
   }
-  dbSave('pedidos',pedData);
-  // quando pago e entregar - finalizar automaticamente
-  if(p.entregue&&(p.pago==true||p.pago==='true')){
-    setTimeout(()=>moverHistorico(p),100);
-  } else {
-    renderPedidos();updBadge();
+
+  // ── VERIFICAR ESTOQUE ANTES DE ENTREGAR ──
+  var falta=verificarEstoque(p);
+  if(falta.length){
+    // montar mensagem de itens em falta
+    var msg=falta.map(f=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd2)">
+      <span style="font-size:13px;color:var(--tx2)">${f.nome}</span>
+      <span style="font-size:12px;font-family:var(--mo);color:var(--r3)">precisa ${f.precisa} · tem ${f.tem}</span>
+    </div>`).join('');
+    // mostrar modal de estoque insuficiente
+    window._semEstoqueId=id;
+    var msh=document.getElementById('m-sem-estoque-body');
+    if(msh)msh.innerHTML=msg;
+    openModal('m-sem-estoque');
+    return;
   }
-  toast(p.entregue?'✓ Marcado como entregue':'Desmarcado');
+
+  // marcando entregue — desconta estoque SEMPRE aqui
+  p.entregue=true;
+  p._estoqueDescontado=true;
+  descontarEstoque(p);
+
+  if(isTrue(p.pago)){
+    // pago + entregue → finaliza
+    salvarPedidoCache(p);
+    dbSave('pedidos',{...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(p.itens)});
+    toast('✅ Entregue! Finalizando...','ok');
+    setTimeout(()=>moverHistorico(p),600);
+  }else{
+    // não pago → avisa
+    salvarPedidoCache(p);
+    dbSave('pedidos',{...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(p.itens)});
+    window._entregaSemPgtoId=id;
+    openModal('m-entrega-sem-pgto');
+  }
+}
+
+
+function entregaSemPgtoAcao(acao){
+  closeModal('m-entrega-sem-pgto');
+  var id=window._entregaSemPgtoId;
+  var p=pedidos.find(x=>String(x.id)===String(id));
+  if(!p)return;
+  if(acao==='cobrar'){
+    abrirPgto(id);
+  }else if(acao==='fiado'){
+    window._pgtoId=id;
+    fecharPendente();
+  }
+}
+
+function finalizarComanda(id){
+  var p=pedidos.find(x=>String(x.id)===String(id));
+  if(!p)return;
+  if(!isTrue(p.pago)){toast('Registre o pagamento primeiro!','err');return}
+  if(!isTrue(p.entregue)){toast('Marque como entregue primeiro!','err');return}
+  moverHistorico(p);
 }
 
 function abrirPgto(id){
@@ -1724,13 +1870,18 @@ function abrirPgto(id){
   window._pgtoId=id;
   window._pgtoTotal=parseFloat(p.total_editado||p.total)||0;
   window._creditoUsado=false;
-  document.getElementById('pgto-val').textContent=fmt(window._pgtoTotal);
+  // restaurar botões (pode ter vindo de pagarPendente)
+  var bA=document.getElementById('btn-aguardar-pgto'),bFi=document.getElementById('btn-pendente-pgto'),ou=document.getElementById('pgto-ou');
+  if(bA)bA.style.display='';if(bFi)bFi.style.display='';if(ou)ou.style.display='';
+  // mostrar dívida do cliente se houver
+  var cl=p.cliente_id?clientes.find(c=>String(c.id)===String(p.cliente_id)):null;
+  var divida=cl&&parseFloat(cl.divida)||0;
+  var valEl=document.getElementById('pgto-val');
+  if(valEl){divida>0?valEl.innerHTML=fmt(window._pgtoTotal)+'<div style="font-size:11px;color:var(--a);margin-top:4px">⚠️ Cliente deve '+fmt(divida)+'</div>':valEl.textContent=fmt(window._pgtoTotal);}
   document.getElementById('pgto-forma').value='';
   document.getElementById('pgto-recebido').value='';
   document.querySelectorAll('.pgto-chip').forEach(c=>c.classList.remove('active'));
   var tr=document.getElementById('pgto-troco');if(tr)tr.style.display='none';
-  // verificar credito do cliente
-  var cl=p.cliente_id?clientes.find(c=>String(c.id)===String(p.cliente_id)):null;
   var credito=cl&&parseFloat(cl.credito)||0;
   var boxCred=document.getElementById('pgto-credito-box');
   if(boxCred){
@@ -1850,69 +2001,73 @@ function calcTroco(){
 
 function atualizarBotoesPgto(){
   var forma=document.getElementById('pgto-forma').value;
-  var total=window._pgtoTotal||0;
-  var recebido=parseFloat(document.getElementById('pgto-recebido').value)||0;
-  var falta=recebido>0&&recebido<total;
   var semForma=!forma;
-  var mostrarPendente=semForma||falta;
   var btnFin=document.getElementById('btn-finalizar-pgto');
   var btnAg=document.getElementById('btn-aguardar-pgto');
-  var btnPend=document.getElementById('btn-pendente-pgto');
-  var ou=document.getElementById('pgto-ou');
   if(btnFin){btnFin.style.opacity=semForma?'.4':'1';btnFin.style.cursor=semForma?'not-allowed':'pointer'}
-  if(btnAg){btnAg.style.opacity=semForma?'.4':'1';btnAg.style.cursor=semForma?'not-allowed':'pointer'}
-  if(btnPend)btnPend.style.display=mostrarPendente?'block':'none';
-  if(ou)ou.style.display=mostrarPendente?'block':'none';
+  if(btnAg&&btnAg.style.display!=='none'){btnAg.style.opacity=semForma?'.4':'1';btnAg.style.cursor=semForma?'not-allowed':'pointer'}
+  // fiado sempre ativo
+  var btnPend=document.getElementById('btn-pendente-pgto');
+  if(btnPend&&btnPend.style.display!=='none'){btnPend.style.opacity='1';btnPend.style.cursor='pointer'}
 }
 
 function confirmarPgto(modo){
   var forma=document.getElementById('pgto-forma').value;
-  // pagar uma pendencia do historico
+  // pagar pendencia do historico (fiado)
   if(window._pgtoFromHist){
     if(!forma){toast('Selecione a forma de pagamento','err');return}
     var h=historico.find(x=>String(x.id)===String(window._pgtoId));
     if(h){
       h.pago=true;h.pgto=forma;h.pendente=false;
       dbSave('historico',h);
+      // zera dívida do cliente
+      var clH=h.cliente_id?clientes.find(c=>String(c.id)===String(h.cliente_id)):null;
+      if(clH){clH.divida=0;dbSave('clientes',clH);if(empresa){var cH=LS.g('data_'+empresa.id)||{};if(cH.clientes){var iH=cH.clientes.findIndex(x=>String(x.id)===String(clH.id));if(iH>=0)cH.clientes[iH]=clH;LS.s('data_'+empresa.id,cH)}}}
       toast('Pagamento confirmado! ✅','ok');
     }
-    window._pgtoFromHist=false;
-    closeModal('m-pgto');
-    renderAll();
-    return;
+    // restaurar botões
+    var bA=document.getElementById('btn-aguardar-pgto'),bF=document.getElementById('btn-pendente-pgto'),ou=document.getElementById('pgto-ou');
+    if(bA)bA.style.display='';if(bF)bF.style.display='';if(ou)ou.style.display='';
+    window._pgtoFromHist=false;closeModal('m-pgto');renderAll();return;
   }
   if(!forma){toast('Selecione a forma de pagamento','err');return}
-  var p=pedidos.find(x=>String(x.id)===String(window._pgtoId));if(!p)return;
+  var p=pedidos.find(x=>String(x.id)===String(window._pgtoId));
+  if(!p)return;
   p.pgto=forma;
   p.pago=true;
+  // troco/credito
   var recebido=parseFloat(document.getElementById('pgto-recebido').value)||0;
   if(recebido>0){p.valor_recebido=recebido;p.troco=recebido-(window._pgtoTotal||p.total)}
-  // atualizar credito do cliente
   if(window._creditoUsado&&window._clienteId){
     var cl=clientes.find(c=>String(c.id)===String(window._clienteId));
     if(cl){
-      var novoCredito=(parseFloat(cl.credito)||0)-(window._creditoAbatido||0);
-      // se teve troco vira credito novo
-      var trocoNovo=recebido>0?Math.max(0,recebido-(window._pgtoTotalComCredito||0)):0;
-      cl.credito=Math.max(0,novoCredito)+trocoNovo;
+      cl.credito=Math.max(0,(parseFloat(cl.credito)||0)-(window._creditoAbatido||0));
       dbSave('clientes',cl);
     }
   }else if(recebido>0){
-    // troco vira credito se cliente cadastrado
     var trocoVal=recebido-(window._pgtoTotal||p.total);
     if(trocoVal>0&&p.cliente_id){
       var cl2=clientes.find(c=>String(c.id)===String(p.cliente_id));
       if(cl2){cl2.credito=(parseFloat(cl2.credito)||0)+trocoVal;dbSave('clientes',cl2)}
     }
   }
+  var pedData={...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(p.itens)};
+  // salvar cache local
+  if(empresa){
+    var cache=LS.g('data_'+empresa.id)||{};
+    if(!cache.pedidos)cache.pedidos=[];
+    var idx=cache.pedidos.findIndex(x=>String(x.id)===String(p.id));
+    if(idx>=0)cache.pedidos[idx]=pedData;
+    LS.s('data_'+empresa.id,cache);
+  }
+  dbSave('pedidos',pedData);
   closeModal('m-pgto');
   if(modo==='finalizar'){
-    p.entregue=true;
+    // pagar e finalizar direto (sem entregar antes)
     moverHistorico(p);
-  }else if(modo==='aguardar'){
-    p.entregue=false;
-    dbSave('pedidos',{...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(p.itens)});
-    toast('Pago! Aguardando entrega 📦','ok');
+  }else{
+    // aguardar entrega: card fica azul
+    toast('💳 Pago! Aguardando entrega para finalizar','ok');
     renderAll();
   }
 }
@@ -1939,9 +2094,21 @@ function fecharPendente(){
   p.entregue=true;
   p.pago=false;
   p.finalizado_em=Date.now();
-  // salvar no historico como pendente E manter nos pedidos pendentes
+  // desconta estoque se ainda não foi descontado
+  if(!isTrue(p._estoqueDescontado)){
+    descontarEstoque(p);
+  }
+  // acumula dívida no cliente
+  if(p.cliente_id){
+    var clF=clientes.find(c=>String(c.id)===String(p.cliente_id));
+    if(clF){
+      clF.divida=(parseFloat(clF.divida)||0)+(parseFloat(p.total_editado||p.total)||0);
+      dbSave('clientes',clF);
+      if(empresa){var cacheC=LS.g('data_'+empresa.id)||{};if(cacheC.clientes){var iC=cacheC.clientes.findIndex(x=>String(x.id)===String(clF.id));if(iC>=0)cacheC.clientes[iC]=clF;LS.s('data_'+empresa.id,cacheC)}}
+    }
+  }
   var hr={...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(parseItens(p.itens)),pendente:true,finalizado_em:Date.now()};
-  delete hr._local;
+  delete hr._local;delete hr._estoqueDescontado;
   dbSave('historico',hr);
   dbDelete('pedidos',p.id);
   historico.unshift(hr);
@@ -1952,7 +2119,7 @@ function fecharPendente(){
     cache.pedidos=pedidos;
     LS.s('data_'+empresa.id,cache);
   }
-  toast('Fechado como pendente 🟠','warn');
+  toast('Fiado registrado 🟠','warn');
   closeModal('m-pgto');
   renderAll();
   // mudar para aba pendentes
@@ -1964,7 +2131,19 @@ function pagarPendente(id){
   var p=historico.find(x=>String(x.id)===String(id));if(!p)return;
   window._pgtoId=id;
   window._pgtoFromHist=true;
-  document.getElementById('pgto-val').textContent=fmt(p.total_editado||p.total);
+  window._pgtoTotal=parseFloat(p.total_editado||p.total)||0;
+  var cl=p.cliente_id?clientes.find(c=>String(c.id)===String(p.cliente_id)):null;
+  var divida=cl&&parseFloat(cl.divida)||0;
+  var valEl=document.getElementById('pgto-val');
+  if(valEl){divida>0?valEl.innerHTML=fmt(window._pgtoTotal)+'<div style="font-size:11px;color:var(--a);margin-top:4px">+ '+fmt(divida)+' dívida anterior = <strong>'+fmt(window._pgtoTotal+divida)+'</strong></div>':valEl.textContent=fmt(window._pgtoTotal);}
+  document.getElementById('pgto-forma').value='';
+  document.getElementById('pgto-recebido').value='';
+  document.querySelectorAll('.pgto-chip').forEach(c=>c.classList.remove('active'));
+  var tr=document.getElementById('pgto-troco');if(tr)tr.style.display='none';
+  // esconder botões irrelevantes (já foi entregue, já é fiado)
+  var bA=document.getElementById('btn-aguardar-pgto'),bFi=document.getElementById('btn-pendente-pgto'),ou=document.getElementById('pgto-ou');
+  if(bA)bA.style.display='none';if(bFi)bFi.style.display='none';if(ou)ou.style.display='none';
+  atualizarBotoesPgto();
   openModal('m-pgto');
 }
 
@@ -1984,32 +2163,16 @@ function moverHistorico(p){
   }
   // estoque ok - finalizar
   var its=parseItens(p.itens);
-  console.log('Itens para desconto:',JSON.stringify(its.map(i=>({prodId:i.prodId,nome:i.nome,qtd:i.qtd}))));
-  console.log('Produtos disponíveis:',JSON.stringify(produtos.map(p=>({id:p.id,nome:p.nome,qtd:p.qtd}))));
+  // cupons
   its.forEach(it=>{
     if(it.cupom){var c=cupons.find(x=>x.codigo===it.cupom);if(c){c.usos=(parseInt(c.usos)||0)+1;dbSave('cupons',c)}}
-    var prod=produtos.find(x=>String(x.id)===String(it.prodId||it.id||''));
-    if(prod){
-      var qtdAntes=parseInt(prod.qtd)||0;
-      var qtdDescontar=parseInt(it.qtd)||1;
-      prod.qtd=Math.max(0,qtdAntes-qtdDescontar);
-      console.log('Estoque descontado:',prod.nome,qtdAntes,'->',prod.qtd);
-      dbSave('produtos',prod);
-      // atualizar cache de produtos
-      if(empresa){
-        var cacheProd=LS.g('data_'+empresa.id)||{};
-        if(cacheProd.produtos){
-          var idxP=cacheProd.produtos.findIndex(x=>String(x.id)===String(prod.id));
-          if(idxP>=0)cacheProd.produtos[idxP]=prod;
-          LS.s('data_'+empresa.id,cacheProd);
-        }
-      }
-    } else {
-      console.warn('Produto não encontrado para desconto:',it.prodId,it.nome);
-    }
   });
+  // estoque só desconta aqui se NÃO foi entregue antes (ex: "pagar e finalizar" direto)
+  if(!isTrue(p._estoqueDescontado)){
+    descontarEstoque(p);
+  }
   var hr={...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(its),finalizado_em:Date.now()};
-  delete hr._local;delete hr._pending;delete hr._moveToHistory;
+  delete hr._local;delete hr._pending;delete hr._moveToHistory;delete hr._estoqueDescontado;
   // remover da lista local IMEDIATAMENTE — online ou offline
   historico.unshift(hr);
   pedidos=pedidos.filter(x=>String(x.id)!==String(p.id));
@@ -2173,7 +2336,8 @@ function renderCaixa(){
   var bruto=fatV;var liquido=fatV+fatE-fatD;
   var el_b=document.getElementById('cx-bruto');if(el_b)el_b.textContent=fmtN(bruto);
   var el_l=document.getElementById('cx-liq');if(el_l)el_l.textContent=fmtN(liquido);
-  document.getElementById('cx-ent-v').textContent=fmtN(fatV+fatE);
+  var fatPend=historico.filter(p=>p.pendente==true||p.pendente==='true').reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
+  document.getElementById('cx-ent-v').textContent=fmtN(fatPend);
   document.getElementById('cx-desp-v').textContent=fmtN(fatD);
   document.getElementById('cx-saldo').textContent=fmt(liquido);
   var byPgto={Pix:0,Dinheiro:0,'Crédito':0,'Débito':0};
@@ -2501,18 +2665,24 @@ function renderClientes(){
         var pedsCl=historico.filter(p=>String(p.cliente_id)===String(c.id));
         var totCl=pedsCl.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
         var credCl=parseFloat(c.credito)||0;
-        return`<div class="card" style="${credCl>0?'border:1px solid rgba(59,130,246,.35)':''}"><div class="card-accent"></div>
+        var dividaCl=parseFloat(c.divida)||0;
+        var temDiv=dividaCl>0;
+        return`<div class="card" style="${temDiv?'border:1px solid rgba(245,158,11,.45);background:rgba(245,158,11,.04)':credCl>0?'border:1px solid rgba(59,130,246,.35)':''}"><div class="card-accent"></div>
           <div class="ch">
             <div style="display:flex;align-items:center;gap:10px">
-              <div class="av" style="width:38px;height:38px;font-size:13px;${credCl>0?'background:linear-gradient(135deg,var(--b),#185FA5)':''}">${ini(c.nome)}</div>
-              <div><div class="ct">${c.nome}</div><div class="cs">${c.cpf_cnpj?c.cpf_cnpj+' · ':''}${c.telefone||''}</div>${c.endereco?`<div class="cs">${c.endereco}</div>`:''}</div>
+              <div class="av" style="width:38px;height:38px;font-size:13px;${temDiv?'background:linear-gradient(135deg,var(--a),#b45309)':credCl>0?'background:linear-gradient(135deg,var(--b),#185FA5)':''}">${ini(c.nome)}</div>
+              <div><div class="ct">${c.nome}</div><div class="cs">${c.cpf_cnpj?c.cpf_cnpj+' · ':''}${c.telefone||''}</div>${c.endereco?`<div class="cs">${c.endereco}</div>`:''}
+              ${temDiv?`<span class="b ba" style="margin-top:3px">🟠 Deve ${fmt(dividaCl)}</span>`:''}</div>
             </div>
             <div style="text-align:right">
-              <div style="font-size:14px;font-weight:700;color:var(--g);font-family:var(--mo)">${fmt(totCl)}</div>
+              <div style="font-size:14px;font-weight:700;color:${temDiv?'var(--a)':credCl>0?'var(--b)':'var(--g)'};font-family:var(--mo)">${fmt(totCl)}</div>
               <div style="font-size:10px;color:var(--tx4)">${pedsCl.length} ped.</div>
             </div>
           </div>
-          ${credCl>0?`<div style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);border-radius:9px;padding:8px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+          ${temDiv?`<div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:9px;padding:8px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:12px;color:#FCD34D;font-weight:600">🟠 Dívida pendente</span>
+            <span style="font-size:15px;font-weight:700;color:#FCD34D;font-family:var(--mo)">${fmt(dividaCl)}</span>
+          </div>`:credCl>0?`<div style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);border-radius:9px;padding:8px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:12px;color:#93C5FD;font-weight:600">Crédito disponível</span>
             <span style="font-size:15px;font-weight:700;color:#93C5FD;font-family:var(--mo)">${fmt(credCl)}</span>
           </div>`:''}
@@ -2996,7 +3166,9 @@ function editCupom(id){
 function toggleCupom(id){
   var c=cupons.find(x=>String(x.id)===String(id));if(!c)return;
   c.ativo=!(c.ativo==true||c.ativo==='true');
-  dbSave('cupons',c);renderCupons();
+  dbSave('cupons',c);
+  if(empresa){var cCup2=LS.g('data_'+empresa.id)||{};cCup2.cupons=cupons;LS.s('data_'+empresa.id,cCup2)}
+  renderCupons();
   toast(c.ativo?'Cupom ativado ✓':'Cupom desativado');
 }
 
@@ -3016,7 +3188,10 @@ function salvarCupom(){
   }else{
     if(cupons.find(x=>x.codigo===cod)){toast('Código já existe','err');return}
     var nc={id:uid(),empresa_id:empresa.id,codigo:cod,descricao:desc,tipo,valor:val,limite:lim,comissao:comm,usos:0,ativo:true};
-    cupons.push(nc);dbSave('cupons',nc);toast('Cupom criado! 🎟️','ok');
+    cupons.push(nc);
+    dbSave('cupons',nc);
+    if(empresa){var cCup=LS.g('data_'+empresa.id)||{};cCup.cupons=cupons;LS.s('data_'+empresa.id,cCup)}
+    toast('Cupom criado! 🎟️','ok');
   }
   closeModal('m-cupom');renderCupons();renderAll();
 }
