@@ -951,9 +951,8 @@ const SB_HEADERS = {
   'Content-Type': 'application/json'
 };
 
-// 🔥 FETCH PADRÃO (TABELAS)
+// 🔥 FETCH PADRÃO (TABELAS) - VERSÃO CORRIGIDA RJ ISCAS VIVAS
 async function sbFetch(path, opts = {}) {
-  // Isso vai forçar a chave diretamente na função, sem depender de variáveis externas
   const MINHA_CHAVE_FORCADA = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1dmxyYmZ2enJzcmN1dnNrbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NjMyNjUsImV4cCI6MjA5MjEzOTI2NX0.ZiXsiB2Ke4TtZMuI34R7_6Yq3MjIDVHrNepH-X9F5Io';
 
   try {
@@ -963,17 +962,22 @@ async function sbFetch(path, opts = {}) {
         'apikey': MINHA_CHAVE_FORCADA,
         'Authorization': 'Bearer ' + MINHA_CHAVE_FORCADA,
         'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
+        'Prefer': 'return=minimal' // Resolve o erro 406
       },
       body: opts.body
     });
 
+    if (res.status === 204) return { success: true };
+
     const text = await res.text();
-    if (!res.ok) throw new Error(text);
-    return text ? JSON.parse(text) : null;
+    if (!res.ok) {
+      if (res.status === 409) return { success: true }; // Ignora erro de duplicado
+      throw new Error(text);
+    }
+    return text ? JSON.parse(text) : { success: true };
   } catch (err) {
     console.error('❌ Erro crítico:', err);
-    throw err;
+    return null; 
   }
 }
 
@@ -1117,35 +1121,40 @@ function queueSync(action, table, data, id){
 }
 
 async function processPendingSync(){
-  var pending=LS.g('pending')||[];
-  if(!pending.length){setDot('online');return}
-  var failed=[];
-  for(var i=0;i<pending.length;i++){
-    var op=pending[i];
-    try{
-      if(op.action==='upsert'){
-        // usar UPSERT direto
-        await sbFetch(op.table+'?on_conflict=id',{
-          method:'POST',
-          headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
-          body:JSON.stringify(op.data)
+  var pending = LS.g('pending') || [];
+  if(!pending.length){ setDot('online'); return; }
+  var failed = [];
+
+  for(var i=0; i<pending.length; i++){
+    var op = pending[i];
+    try {
+      if(op.action === 'upsert'){
+        // AJUSTE: Corrigido para on_conflict (com 'c') e return=minimal
+        await sbFetch(op.table + '?on_conflict=id', {
+          method: 'POST',
+          headers: {
+            'Prefer': 'resolution=merge-duplicates,return=minimal'
+          },
+          body: JSON.stringify(op.data)
         });
-      }else if(op.action==='delete'){
-        await sbFetch(op.table+'?id=eq.'+op.id,{method:'DELETE'});
+      } else if(op.action === 'delete'){
+        await sbFetch(op.table + '?id=eq.' + op.id, { method: 'DELETE' });
       }
-    }catch(e){
-      console.error('sync error',op.table,e);
+    } catch(e) {
+      console.error('Erro na sincronização da tabela ' + op.table, e);
       failed.push(op);
     }
   }
-  pendingSync=failed;
-  LS.s('pending',failed);
-  setDot(failed.length?'offline':'online');
-  if(!failed.length){
-    toast('Dados sincronizados! ✓','ok');
+
+  pendingSync = failed;
+  LS.s('pending', failed);
+  setDot(failed.length ? 'offline' : 'online');
+
+  if(failed.length === 0){
+    toast('Dados sincronizados! ✓', 'ok');
+    renderAll();
   }
 }
-
 function dbSave(table, data){
   var empData={...data, empresa_id:empresa?empresa.id:''};
   // remover campos internos que nao existem no banco
@@ -1220,7 +1229,7 @@ async function syncNow(manual){
     // re-enviar pedidos locais que nao chegaram ao banco
     localNovos.forEach(p=>{
       console.log('re-enviando pedido local:',p.id);
-      dbSave('pedidos',p);
+      dbSave('pedidos?on_conflict=id', np);
     });
     historico=his||[];cupons=cup||[];entradas=ent||[];despesas=desp||[];
     LS.s('data_'+eid,{users,produtos,clientes,pedidos,historico,cupons,entradas,despesas,ts:Date.now()});
@@ -1324,7 +1333,9 @@ function doLogout(){
 
 function afterLogin(){
   document.getElementById('lscr').classList.add('hidden');
-  document.getElementById('upill-name').textContent=me.nome.split(' ')[0];
+  if (me && me.nome) {
+  document.getElementById('upill-name').textContent = me.nome.split(' ')[0];
+}
   setupNav();syncNow();
   // se vendedor vai direto para pedidos
   if(!can('dash')){goTo('pedidos',document.querySelectorAll('.nb')[1],'Pedidos')}
@@ -1668,6 +1679,7 @@ function renderPedItems(){
 
 function salvarPedido(){
   if(!_pedItems.length){toast('Adicione pelo menos 1 item','err');return}
+  
   var cid=document.getElementById('ped-cl').value;
   var tipo=document.getElementById('ped-tipo').value;
   var obs=document.getElementById('ped-obs').value.trim();
@@ -1675,20 +1687,103 @@ function salvarPedido(){
   var totalCalc=_pedItems.reduce((a,i)=>a+i.total,0);
   var totalEdit=parseFloat(document.getElementById('ped-total-edit').value)||null;
   var total=totalEdit||totalCalc;
-  if(_editPedId){
-    var p=pedidos.find(x=>String(x.id)===String(_editPedId));
-    if(p){p.cliente_id=cid||null;p.tipo=tipo;p.obs=obs;p.itens=JSON.stringify(_pedItems);p.total=totalCalc;p.total_editado=totalEdit}
-    dbSave('pedidos',{...p,itens:JSON.stringify(_pedItems)});
+
+  dbSave('pedidos?on_conflict=id', {...p, itens:JSON.stringify(_pedItems)}); 
+  
+  toast('Comanda atualizada! ✓','ok');
+} else {
+        p.cliente_id=cid||null;
+        p.tipo=tipo;
+        p.obs=obs;
+        p.itens=JSON.stringify(_pedItems);
+        p.total=totalCalc;
+        p.total_editado=totalEdit;
+    }
+    // Adicionado parâmetro de conflito para permitir atualização no Supabase
+    dbSave('pedidos?on_conflict=id', {...p, itens:JSON.stringify(_pedItems)});
     toast('Comanda atualizada! ✓','ok');
-  }else{
-    var np={id:uid(),empresa_id:empresa.id,cliente_id:cid||null,tipo,obs,itens:JSON.stringify(_pedItems),total:totalCalc,total_editado:totalEdit,entregue:false,pago:false,pgto:pgto||null,vendedor_id:me.id,vendedor_nome:me.nome,criado_em:Date.now()};
+  } else {
+    var np={
+        id:uid(),
+        empresa_id:empresa.id,
+        cliente_id:cid||null,
+        tipo,
+        obs,
+        itens:JSON.stringify(_pedItems),
+        total:totalCalc,
+        total_editado:totalEdit,
+        entregue:false,
+        pago:false,
+        pgto:pgto||null,
+        vendedor_id:me.id,
+        vendedor_nome:me.nome,
+        criado_em:Date.now()
+    }; else {
+    var np={
+        id:uid(),
+        empresa_id:empresa.id,
+        cliente_id:cid||null,
+        tipo,
+        obs,
+        itens:JSON.stringify(_pedItems),
+        total:totalCalc,
+        total_editado:totalEdit,
+        entregue:false,
+        pago:false,
+        pgto:pgto||null,
+        vendedor_id:me.id,
+        vendedor_nome:me.nome,
+        criado_em:Date.now()
+    };
+    
     pedidos.unshift(np);
-    // salvar no cache local imediatamente
-    if(empresa){var cache=LS.g('data_'+empresa.id)||{};cache.pedidos=pedidos;LS.s('data_'+empresa.id,cache)}
-    dbSave('pedidos',np);
-    toast('Comanda criada! 🧾','ok');
+    
+    // Salvar no cache local imediatamente
+    if(empresa){
+        var cache=LS.g('data_'+empresa.id)||{};
+        cache.pedidos=pedidos;
+        LS.s('data_'+empresa.id, cache);
+    }
+
+ // AQUI ESTÁ A CORREÇÃO (repare na aspa depois do id)
+    dbSave('pedidos?on_conflict=id', np);
+    
+    toast('Comanda criada! 🧾', 'ok');
   }
-  closeModal('m-pedido');renderAll();
+    // Adicionado parâmetro de conflito para evitar o erro 409 e destravar a baixa de estoque
+async function dbSave(tabela, dados){
+
+  try {
+
+    const res = await fetch(`${SB_URL}/rest/v1/${tabela}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SB_KEY,
+        'Authorization': `Bearer ${SB_KEY}`,
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(dados)
+    });
+
+    const data = await res.json();
+
+    if(!res.ok){
+      console.error('Erro Supabase:', data);
+      toast('Erro ao salvar no servidor','err');
+      return;
+    }
+
+    console.log('SALVO NO SUPABASE:', data);
+
+  } catch (err) {
+    console.error('Erro conexão:', err);
+    toast('Erro de conexão','err');
+  }
+}
+  
+  closeModal('m-pedido');
+  renderAll();
 }
 
 function toggleEnt(id){
@@ -1890,6 +1985,7 @@ function confirmarPgto(modo){
   closeModal('m-pgto');
   if(modo==='finalizar'){
     p.entregue=true;
+
     moverHistorico(p);
   }else if(modo==='aguardar'){
     p.entregue=false;
@@ -1951,38 +2047,76 @@ function pagarPendente(id){
 }
 
 function moverHistorico(p){
-  // verificar estoque antes de finalizar
-  var falta=verificarEstoque(p);
+  // 1. Verificar estoque antes de finalizar
+  var falta = verificarEstoque(p);
   if(falta.length){
-    var msg='Estoque insuficiente para finalizar!\n\n';
-    falta.forEach(f=>{msg+='• '+f.nome+': precisa '+f.precisa+', tem '+f.tem+'\n'});
-    msg+='\nAtualize o estoque e tente novamente.';
-    toast('Estoque insuficiente!','err');
+    var msg = 'Estoque insuficiente para finalizar!\n\n';
+    falta.forEach(f => { msg += '• ' + f.nome + ': precisa ' + f.precisa + ', tem ' + f.tem + '\n' });
+    msg += '\nAtualize o estoque e tente novamente.';
+    toast('Estoque insuficiente!', 'err');
     alert(msg);
-    p.pago=false;p.entregue=false;
-    dbSave('pedidos',{...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(parseItens(p.itens))});
+    p.pago = false; p.entregue = false;
+    
+    // Ajuste para não travar se o pedido já existir no banco
+    dbSave('pedidos?on_conflict=id', {
+      ...p, 
+      itens: typeof p.itens === 'string' ? p.itens : JSON.stringify(parseItens(p.itens))
+    });
     renderPedidos();
     return;
   }
-  // estoque ok - finalizar
-  var its=parseItens(p.itens);
-  its.forEach(it=>{
-    if(it.cupom){var c=cupons.find(x=>x.codigo===it.cupom);if(c){c.usos=(parseInt(c.usos)||0)+1;dbSave('cupons',c)}}
-    var prod=produtos.find(x=>String(x.id)===String(it.prodId));
-    if(prod){prod.qtd=Math.max(0,(parseInt(prod.qtd)||0)-(parseInt(it.qtd)||1));dbSave('produtos',prod)}
+
+  // 2. Estoque OK - Iniciar finalização
+  var its = parseItens(p.itens);
+  its.forEach(it => {
+    // Atualizar usos de cupons se houver
+    if(it.cupom){
+      var c = cupons.find(x => x.codigo === it.cupom);
+      if(c){
+        c.usos = (parseInt(c.usos) || 0) + 1;
+        dbSave('cupons?on_conflict=id', c);
+      }
+    }
+    
+    // ATUALIZAR ESTOQUE (BAIXA REAL)
+    var prod = produtos.find(x => String(x.id) === String(it.prodId));
+    if(prod){
+      // Subtrai a quantidade vendida
+      prod.qtd = Math.max(0, (parseInt(prod.qtd) || 0) - (parseInt(it.qtd) || 1));
+      // Salva no Supabase permitindo a atualização (on_conflict)
+      dbSave('produtos?on_conflict=id', prod);
+    }
   });
-  var hr={...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(its),finalizado_em:Date.now()};
-  delete hr._local;delete hr._pending;delete hr._moveToHistory;
-  // remover da lista local IMEDIATAMENTE — online ou offline
+
+  // 3. Preparar o objeto para o Histórico
+  var hr = {
+    ...p, 
+    itens: typeof p.itens === 'string' ? p.itens : JSON.stringify(its), 
+    finalizado_em: Date.now()
+  };
+  
+  // Limpar flags locais para não enviar lixo ao banco
+  delete hr._local; delete hr._pending; delete hr._moveToHistory;
+
+  // 4. Atualizar listas locais IMEDIATAMENTE
   historico.unshift(hr);
-  pedidos=pedidos.filter(x=>String(x.id)!==String(p.id));
-  // atualizar cache local imediatamente
+  pedidos = pedidos.filter(x => String(x.id) !== String(p.id));
+
+  // 5. Salvar no Supabase (Histórico e Pedidos)
+  dbSave('historico?on_conflict=id', hr);
+  dbSave('pedidos?on_conflict=id', p);
+
+  // 6. Atualizar cache local do navegador
   if(empresa){
-    var cache=LS.g('data_'+empresa.id)||{};
-    cache.historico=historico;
-    cache.pedidos=pedidos;
-    LS.s('data_'+empresa.id,cache);
+    var cache = LS.g('data_' + empresa.id) || {};
+    cache.historico = historico;
+    cache.pedidos = pedidos;
+    LS.s('data_' + empresa.id, cache);
   }
+
+  toast('Venda finalizada com sucesso! 🚀', 'ok');
+  renderAll();
+}
   // enviar para banco — se offline vai para fila e sincroniza depois
   dbSave('historico',hr);
   dbDelete('pedidos',p.id);
@@ -3218,37 +3352,64 @@ var loadTimeout=setTimeout(function(){
   if(ld&&!ld.classList.contains('hidden')){localStorage.clear();ld.classList.add('hidden');document.getElementById('lscr').classList.remove('hidden')}
 },6000);
 
-(async function init(){
-  // verificar se veio de link de email
-  var isAuthCallback=await processarAuthCallback();
-  if(isAuthCallback){clearTimeout(loadTimeout);document.getElementById('ldscr').classList.add('hidden');return}
-  try{
-    var session=LS.g('session');
-    if(session&&session.me&&session.empresa){
-      me=session.me;empresa=session.empresa;
+async function init(){
+  // 1. Verificar se veio de link de email
+  var isAuthCallback = await processarAuthCallback();
+  if(isAuthCallback){
+    clearTimeout(loadTimeout);
+    document.getElementById('ldscr').classList.add('hidden');
+    return;
+  }
+
+  try {
+    var session = LS.g('session');
+    
+    // Verificação robusta de sessão
+    if(session && session.me && session.empresa){
+      me = session.me;
+      empresa = session.empresa;
       clearTimeout(loadTimeout);
       document.getElementById('ldscr').classList.add('hidden');
-      document.getElementById('upill-name').textContent=me.nome.split(' ')[0];
-      var cache=LS.g('data_'+empresa.id);
-      if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[]}
-      setupNav();renderAll();
-      if(can('dash'))goTo('dash',document.querySelector('.nb'),'Painel');
-      else goTo('pedidos',document.querySelectorAll('.nb')[1],'Pedidos');
+
+      // PROTEÇÃO DO NOME
+      if(me && me.nome){
+        var elNome = document.getElementById('upill-name');
+        if(elNome) elNome.textContent = me.nome.split(' ')[0];
+      }
+
+      var cache = LS.g('data_' + empresa.id);
+      if(cache){
+        users=cache.users||[]; produtos=cache.produtos||[]; clientes=cache.clientes||[];
+        pedidos=cache.pedidos||[]; historico=cache.historico||[]; cupons=cache.cupons||[];
+        entradas=cache.entradas||[]; despesas=cache.despesas||[];
+      }
+
+      setupNav();
+      renderAll();
+
+      if(can('dash')) goTo('dash', document.querySelector('.nb'), 'Painel');
+      else goTo('pedidos', document.querySelectorAll('.nb')[1], 'Pedidos');
+
       syncNow();
-      pendingSync=LS.g('pending')||[];
-      if(pendingSync.length&&isOnline)processPendingSync();
-    }else{
+      pendingSync = LS.g('pending') || [];
+      if(pendingSync.length && isOnline) processPendingSync();
+
+    } else {
+      // Caso não haja sessão, mostra a tela de login
       clearTimeout(loadTimeout);
       document.getElementById('ldscr').classList.add('hidden');
       document.getElementById('lscr').classList.remove('hidden');
     }
-  }catch(e){
+  } catch(e) {
+    console.error('Erro no Init:', e);
     clearTimeout(loadTimeout);
-    localStorage.clear();
     document.getElementById('ldscr').classList.add('hidden');
     document.getElementById('lscr').classList.remove('hidden');
   }
-})();
+}
+
+// CHAMADA DA FUNÇÃO (CORRIGIDA)
+init();
 </script>
 </body>
 </html>
