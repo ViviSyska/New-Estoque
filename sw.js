@@ -37,3 +37,31 @@ self.addEventListener('fetch',function(e){
     })
   );
 });
+async function testarSupabase() {
+  console.log("Iniciando teste de conexão...");
+  
+  // Substitua pelas suas variáveis que já estão no código
+  const url = SUPABASE_URL; 
+  const key = SUPABASE_KEY;
+
+  try {
+    const resposta = await fetch(`${url}/rest/v1/?apikey=${key}`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${key}` }
+    });
+
+    if (resposta.ok) {
+      console.log("✅ Conexão bem-sucedida! O banco respondeu corretamente.");
+      alert("Conexão com Supabase OK!");
+    } else {
+      console.error("❌ Erro na resposta:", resposta.statusText);
+      alert("Erro de conexão: " + resposta.status);
+    }
+  } catch (error) {
+    console.error("❌ Falha crítica ao conectar:", error);
+    alert("Falha na rede ou URL incorreta.");
+  }
+}
+
+// Chame a função para testar
+// testarSupabase();
