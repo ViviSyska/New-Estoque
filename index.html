@@ -953,27 +953,26 @@ const SB_HEADERS = {
 
 // 🔥 FETCH PADRÃO (TABELAS)
 async function sbFetch(path, opts = {}) {
+  // Isso vai forçar a chave diretamente na função, sem depender de variáveis externas
+  const MINHA_CHAVE_FORCADA = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1dmxyYmZ2enJzcmN1dnNrbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NjMyNjUsImV4cCI6MjA5MjEzOTI2NX0.ZiXsiB2Ke4TtZMuI34R7_6Yq3MjIDVHrNepH-X9F5Io';
+
   try {
     const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+      method: opts.method || 'GET',
       headers: {
-        ...SB_HEADERS,
-        Prefer: 'return=representation',
-        ...(opts.headers || {})
+        'apikey': MINHA_CHAVE_FORCADA,
+        'Authorization': 'Bearer ' + MINHA_CHAVE_FORCADA,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
       },
-      ...opts
+      body: opts.body
     });
 
     const text = await res.text();
-
-    if (!res.ok) {
-      console.error('❌ Supabase erro:', res.status, text);
-      throw new Error(text || 'Erro desconhecido');
-    }
-
+    if (!res.ok) throw new Error(text);
     return text ? JSON.parse(text) : null;
-
   } catch (err) {
-    console.error('❌ Erro conexão Supabase:', err);
+    console.error('❌ Erro crítico:', err);
     throw err;
   }
 }
