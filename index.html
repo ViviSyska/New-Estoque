@@ -941,40 +941,37 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
 // ══════════════════════════════════════
 // SUPABASE CONFIG
 // ══════════════════════════════════════
-var SB_URL ='https://kuvlrbfvzrsrcuvskmbu.supabase.co';
-var SB_KEY ='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1dmxyYmZ2enJzcmN1dnNrbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NjMyNjUsImV4cCI6MjA5MjEzOTI2NX0.ZiXsiB2Ke4TtZMuI34R7_6Yq3MjIDVHrNepH-X9F5Io';
+const SB_URL = 'https://kuvlrbfvzrsrcuvskmbu.supabase.co';
 
-// BASE HEADERS
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1dmxyYmZ2enJzcmN1dnNrbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NjMyNjUsImV4cCI6MjA5MjEzOTI2NX0.ZiXsiB2Ke4TtZMuI34R7_6Yq3MjIDVHrNepH-X9F5Io';
+
+// HEADERS PADRÃO
 const SB_HEADERS = {
-  apikey: SB_KEY,
-  Authorization: 'Bearer ' + SB_KEY,
-  'Content-Type': 'application/json'
+  'Content-Type': 'application/json',
+  'apikey': SB_KEY,
+  'Authorization': `Bearer ${SB_KEY}`,
+  'Prefer': 'return=representation'
 };
 
-// 🔥 FETCH PADRÃO (TABELAS)
-async function sbFetch(path, opts = {}) {
+// ENVIO PARA O SUPABASE
+async function salvarPedido(dados) {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
-      headers: {
-        ...SB_HEADERS,
-        Prefer: 'return=representation',
-        ...(opts.headers || {})
-      },
-      ...opts
+    const res = await fetch(`${SB_URL}/rest/v1/pedidos`, {
+      method: 'POST',
+      headers: SB_HEADERS,
+      body: JSON.stringify(dados)
     });
 
-    const text = await res.text();
+    const data = await res.json();
 
     if (!res.ok) {
-      console.error('❌ Supabase erro:', res.status, text);
-      throw new Error(text || 'Erro desconhecido');
+      console.error('Erro Supabase:', data);
+      return;
     }
 
-    return text ? JSON.parse(text) : null;
-
+    console.log('Salvo com sucesso:', data);
   } catch (err) {
-    console.error('❌ Erro conexão Supabase:', err);
-    throw err;
+    console.error('Erro conexão:', err);
   }
 }
 
