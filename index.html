@@ -944,30 +944,89 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
 var SB_URL = 'https://kuvlrbfvzrsrcuvskmbu.supabase.co';
 var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1dmxyYmZ2enJzcmN1dnNrbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NjMyNjUsImV4cCI6MjA5MjEzOTI2NX0.ZiXsiB2Ke4TtZMuI34R7_6Yq3MjIDVHrNepH-X9F5Io';
 
-function sbFetch(path, opts){
-  return fetch(SB_URL+'/rest/v1/'+path, {
-    headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation',...(opts&&opts.headers||{})},
-    ...opts
-  }).then(r=>{
-    if(r.ok)return r.json().catch(()=>null);
-    return r.text().then(t=>{console.error('sbFetch error:',r.status,t);throw new Error(t)});
-  });
+// BASE HEADERS
+const SB_HEADERS = {
+  apikey: SB_KEY,
+  Authorization: 'Bearer ' + SB_KEY,
+  'Content-Type': 'application/json'
+};
+
+// 🔥 FETCH PADRÃO (TABELAS)
+async function sbFetch(path, opts = {}) {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+      headers: {
+        ...SB_HEADERS,
+        Prefer: 'return=representation',
+        ...(opts.headers || {})
+      },
+      ...opts
+    });
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      console.error('❌ Supabase erro:', res.status, text);
+      throw new Error(text || 'Erro desconhecido');
+    }
+
+    return text ? JSON.parse(text) : null;
+
+  } catch (err) {
+    console.error('❌ Erro conexão Supabase:', err);
+    throw err;
+  }
 }
 
-function sbAuth(path, body){
-  return fetch(SB_URL+'/auth/v1/'+path, {
-    method:'POST',
-    headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
-    body:JSON.stringify(body)
-  }).then(r=>r.json());
+// 🔐 AUTH (login, registro)
+async function sbAuth(path, body) {
+  try {
+    const res = await fetch(`${SB_URL}/auth/v1/${path}`, {
+      method: 'POST',
+      headers: {
+        apikey: SB_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error('❌ Auth erro:', data);
+      throw new Error(data.error_description || 'Erro no auth');
+    }
+
+    return data;
+
+  } catch (err) {
+    console.error('❌ Erro auth:', err);
+    throw err;
+  }
 }
 
-function sbRpc(fn, params){
-  return fetch(SB_URL+'/rest/v1/rpc/'+fn, {
-    method:'POST',
-    headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
-    body:JSON.stringify(params)
-  }).then(r=>r.json());
+// ⚙️ RPC (funções SQL)
+async function sbRpc(fn, params = {}) {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: SB_HEADERS,
+      body: JSON.stringify(params)
+    });
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      console.error('❌ RPC erro:', res.status, text);
+      throw new Error(text || 'Erro RPC');
+    }
+
+    return text ? JSON.parse(text) : null;
+
+  } catch (err) {
+    console.error('❌ Erro RPC:', err);
+    throw err;
+  }
 }
 
 // ══════════════════════════════════════
@@ -979,113 +1038,12 @@ var pendingSync=[];
 var dashPeriod='mes', relPeriod='mes', cxPeriod='mes', histPeriod='mes', entPeriod='mes', despPeriod='mes';
 var isOnline=navigator.onLine;
 
-// ══════════════════════════════════════
-// INDEXEDDB — armazenamento robusto
-// ══════════════════════════════════════
-var _idb=null;
-var _idbReady=false;
-
-function abrirIDB(){
-  return new Promise(function(resolve,reject){
-    if(_idb){resolve(_idb);return}
-    var req=indexedDB.open('ns_estoque_pro',2);
-    req.onupgradeneeded=function(e){
-      var db=e.target.result;
-      if(!db.objectStoreNames.contains('dados')){
-        db.createObjectStore('dados',{keyPath:'chave'});
-      }
-    };
-    req.onsuccess=function(e){
-      _idb=e.target.result;
-      _idbReady=true;
-      resolve(_idb);
-    };
-    req.onerror=function(e){
-      console.error('IDB erro:',e);
-      reject(e);
-    };
-  });
-}
-
-function idbSalvar(chave,valor){
-  return abrirIDB().then(function(db){
-    return new Promise(function(resolve,reject){
-      var tx=db.transaction('dados','readwrite');
-      var store=tx.objectStore('dados');
-      var req=store.put({chave:'ns_'+chave,valor:JSON.stringify(valor)});
-      req.onsuccess=function(){resolve(true)};
-      req.onerror=function(e){
-        console.error('idbSalvar erro:',e);
-        // fallback localStorage
-        try{localStorage.setItem('ns_'+chave,JSON.stringify(valor))}catch(ex){}
-        resolve(false);
-      };
-    });
-  }).catch(function(){
-    try{localStorage.setItem('ns_'+chave,JSON.stringify(valor))}catch(ex){}
-  });
-}
-
-function idbLer(chave){
-  return abrirIDB().then(function(db){
-    return new Promise(function(resolve,reject){
-      var tx=db.transaction('dados','readonly');
-      var store=tx.objectStore('dados');
-      var req=store.get('ns_'+chave);
-      req.onsuccess=function(e){
-        var result=e.target.result;
-        if(result){
-          try{resolve(JSON.parse(result.valor))}
-          catch(ex){resolve(null)}
-        }else{
-          // fallback localStorage
-          try{
-            var v=localStorage.getItem('ns_'+chave);
-            resolve(v?JSON.parse(v):null);
-          }catch(ex){resolve(null)}
-        }
-      };
-      req.onerror=function(){
-        try{
-          var v=localStorage.getItem('ns_'+chave);
-          resolve(v?JSON.parse(v):null);
-        }catch(ex){resolve(null)}
-      };
-    });
-  }).catch(function(){
-    try{
-      var v=localStorage.getItem('ns_'+chave);
-      return v?JSON.parse(v):null;
-    }catch(ex){return null}
-  });
-}
-
-// LS — mantém API síncrona com fallback + salva no IDB em paralelo
+// localStorage cache
 var LS={
-  g:function(k){
-    // ler do localStorage (síncrono para compatibilidade)
-    try{var v=localStorage.getItem('ns_'+k);return v?JSON.parse(v):null}catch(e){return null}
-  },
-  s:function(k,v){
-    // salvar em AMBOS — localStorage (imediato) + IndexedDB (robusto)
-    try{localStorage.setItem('ns_'+k,JSON.stringify(v))}catch(e){}
-    idbSalvar(k,v).catch(function(){});
-  },
+  g:function(k){try{var v=localStorage.getItem('ns_'+k);return v?JSON.parse(v):null}catch(e){return null}},
+  s:function(k,v){try{localStorage.setItem('ns_'+k,JSON.stringify(v))}catch(e){}},
   d:function(k,def){var v=this.g(k);return v!==null?v:def}
 };
-
-// Inicializar IDB e migrar dados do localStorage para IDB
-abrirIDB().then(function(){
-  console.log('IndexedDB pronto ✓');
-  // migrar dados existentes do localStorage para IDB
-  var keys=['session','pending'];
-  keys.forEach(function(k){
-    var v=localStorage.getItem('ns_'+k);
-    if(v){idbSalvar(k,JSON.parse(v)).catch(function(){})}
-  });
-}).catch(function(e){
-  console.warn('IndexedDB indisponível, usando localStorage:',e);
-});
 
 function uid(){return Date.now()+''+Math.floor(Math.random()*9999)}
 
@@ -1167,27 +1125,25 @@ async function processPendingSync(){
     var op=pending[i];
     try{
       if(op.action==='upsert'){
-        var r=await sbFetch(op.table+'?on_conflict=id',{
+        // usar UPSERT direto
+        await sbFetch(op.table+'?on_conflict=id',{
           method:'POST',
           headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
           body:JSON.stringify(op.data)
         });
-        console.log('✅ Sync upsert OK:',op.table,op.data?.id);
       }else if(op.action==='delete'){
         await sbFetch(op.table+'?id=eq.'+op.id,{method:'DELETE'});
-        console.log('✅ Sync delete OK:',op.table,op.id);
       }
     }catch(e){
-      console.error('❌ Sync erro:',op.table,e);
+      console.error('sync error',op.table,e);
       failed.push(op);
     }
   }
   pendingSync=failed;
   LS.s('pending',failed);
   setDot(failed.length?'offline':'online');
-  if(!failed.length&&pending.length>0){
-    toast('Sincronizado! ✓','ok');
-    syncNow();
+  if(!failed.length){
+    toast('Dados sincronizados! ✓','ok');
   }
 }
 
@@ -1195,15 +1151,13 @@ function dbSave(table, data){
   var empData={...data, empresa_id:empresa?empresa.id:''};
   // remover campos internos que nao existem no banco
   delete empData._local;delete empData._pending;delete empData._moveToHistory;
-  // salvar no cache local imediatamente (localStorage + IndexedDB)
+  // salvar no cache local imediatamente
   if(empresa){
     var cache=LS.g('data_'+empresa.id)||{};
     if(!cache[table])cache[table]=[];
     var idx=cache[table].findIndex(x=>String(x.id)===String(data.id));
     if(idx>=0)cache[table][idx]=empData;else cache[table].unshift(empData);
-    // salvar nos dois storages
-    try{localStorage.setItem('ns_data_'+empresa.id,JSON.stringify(cache))}catch(e){}
-    idbSalvar('data_'+empresa.id,cache).catch(function(){});
+    LS.s('data_'+empresa.id,cache);
   }
   if(isOnline){
     sbFetch(table+'?on_conflict=id',{
@@ -1211,24 +1165,14 @@ function dbSave(table, data){
       headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
       body:JSON.stringify(empData)
     }).then(r=>{
-      if(r&&r.length>0){
-        console.log('✅ Salvo no banco:',table,empData.id);
-      }else{
-        console.warn('⚠️ Banco sem retorno:',table,empData.id);
-        // tentar novamente
-        setTimeout(()=>sbFetch(table+'?on_conflict=id',{
-          method:'POST',
-          headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
-          body:JSON.stringify(empData)
-        }).catch(()=>{}),3000);
-      }
+      if(!r)console.warn('dbSave sem retorno',table);
     }).catch(e=>{
-      console.error('❌ Erro ao salvar no banco:',table,e);
+      console.error('dbSave ERRO',table,e);
+      // fallback - guardar na fila para sync posterior
       queueSync('upsert',table,empData);
-      toast('Salvo localmente — sem conexão com servidor','warn');
+      toast('Salvo localmente — sincronizando...','warn');
     });
   }else{
-    console.log('📵 Offline - na fila:',table,empData.id);
     queueSync('upsert',table,empData);
   }
 }
@@ -1267,7 +1211,6 @@ async function syncNow(manual){
       sbFetch('entradas?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc'),
       sbFetch('despesas?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc')
     ]);
-    console.log('🔄 Sync - pedidos no banco:',ped?.length,'historico:',his?.length);
     users=u||[];produtos=p||[];clientes=cl||[];
     // filtrar pedidos que ja foram para o historico
     var histIds=new Set((his||[]).map(h=>String(h.id)));
@@ -1383,13 +1326,6 @@ function doLogout(){
 function afterLogin(){
   document.getElementById('lscr').classList.add('hidden');
   document.getElementById('upill-name').textContent=me.nome.split(' ')[0];
-  // testar conexão com banco
-  sbFetch('pedidos?empresa_id=eq.'+empresa.id+'&select=id&limit=1').then(r=>{
-    console.log('✅ Conexão com banco OK, pedidos encontrados:',r?.length||0);
-  }).catch(e=>{
-    console.error('❌ Erro de conexão com banco:',e);
-    toast('Erro de conexão com servidor!','err');
-  });
   setupNav();syncNow();
   // se vendedor vai direto para pedidos
   if(!can('dash')){goTo('pedidos',document.querySelectorAll('.nb')[1],'Pedidos')}
@@ -3138,6 +3074,7 @@ function adTab(t,el){
   document.getElementById('ad-'+t).style.display='block';
   document.querySelectorAll('#sc-admin .tbb').forEach(b=>b.classList.remove('active'));
   if(el)el.classList.add('active');
+  // preencher campos empresa ao abrir a aba
   if(t==='empresa'&&empresa){
     document.getElementById('emp-nome').value=empresa.nome||'';
     var r=document.getElementById('emp-razao');if(r)r.value=empresa.razao_social||'';
@@ -3274,25 +3211,7 @@ function irParaLogin(){
 }
 
 // limpar cache se URL tiver ?reset
-if(window.location.search.includes('reset')){
-  localStorage.clear();
-  // limpar IndexedDB também
-  indexedDB.deleteDatabase('ns_estoque_pro');
-  window.location.href=window.location.pathname;
-}
-
-// limpar fila de sync corrompida (com erros 401)
-(function limparFilaCorrempida(){
-  try{
-    var pending=JSON.parse(localStorage.getItem('ns_pending')||'[]');
-    // manter só os recentes (últimas 2 horas)
-    var recentes=pending.filter(p=>p.ts&&(Date.now()-p.ts)<7200000);
-    if(recentes.length!==pending.length){
-      localStorage.setItem('ns_pending',JSON.stringify(recentes));
-      console.log('Fila de sync limpa:',pending.length-recentes.length,'itens removidos');
-    }
-  }catch(e){}
-})();
+if(window.location.search.includes('reset')){localStorage.clear();window.location.href=window.location.pathname}
 
 // timeout 6s - se travar no loading vai para login
 var loadTimeout=setTimeout(function(){
@@ -3311,31 +3230,9 @@ var loadTimeout=setTimeout(function(){
       clearTimeout(loadTimeout);
       document.getElementById('ldscr').classList.add('hidden');
       document.getElementById('upill-name').textContent=me.nome.split(' ')[0];
-      // tentar ler do IndexedDB primeiro (mais robusto), depois localStorage
-      var carregarCache=function(cache){
-        if(cache){
-          users=cache.users||[];
-          produtos=cache.produtos||[];
-          clientes=cache.clientes||[];
-          pedidos=cache.pedidos||[];
-          historico=cache.historico||[];
-          cupons=cache.cupons||[];
-          entradas=cache.entradas||[];
-          despesas=cache.despesas||[];
-        }
-        setupNav();renderAll();
-      };
-      idbLer('data_'+empresa.id).then(function(cacheIDB){
-        if(cacheIDB){
-          carregarCache(cacheIDB);
-        }else{
-          var cacheLs=LS.g('data_'+empresa.id);
-          carregarCache(cacheLs);
-        }
-      }).catch(function(){
-        var cacheLs=LS.g('data_'+empresa.id);
-        carregarCache(cacheLs);
-      });
+      var cache=LS.g('data_'+empresa.id);
+      if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[]}
+      setupNav();renderAll();
       if(can('dash'))goTo('dash',document.querySelector('.nb'),'Painel');
       else goTo('pedidos',document.querySelectorAll('.nb')[1],'Pedidos');
       syncNow();
@@ -3353,37 +3250,6 @@ var loadTimeout=setTimeout(function(){
     document.getElementById('lscr').classList.remove('hidden');
   }
 })();
-  async function testarSupabase() {
-  console.log("Iniciando teste de conexão...");
-  
-  // Substitua pelas suas variáveis que já estão no código
-  const url = https://kuvlrbfvzrsrcuvskmbu.supabase.co; 
-  const key = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1dmxyYmZ2enJzcmN1dnNrbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NjMyNjUsImV4cCI6MjA5MjEzOTI2NX0.ZiXsiB2Ke4TtZMuI34R7_6Yq3MjIDVHrNepH-X9F5Io;
-
-  try {
-    const resposta = await fetch(`${url}/rest/v1/?apikey=${key}`, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${key}` }
-    });
-
-    if (resposta.ok) {
-      console.log("✅ Conexão bem-sucedida! O banco respondeu corretamente.");
-      alert("Conexão com Supabase OK!");
-    } else {
-      console.error("❌ Erro na resposta:", resposta.statusText);
-      alert("Erro de conexão: " + resposta.status);
-    }
-  } catch (error) {
-    console.error("❌ Falha crítica ao conectar:", error);
-    alert("Falha na rede ou URL incorreta.");
-  }
-}
-
-// Chame a função para testar
-// testarSupabase();
 </script>
 </body>
 </html>
-
-
-
