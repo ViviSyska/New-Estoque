@@ -398,36 +398,56 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
       <div class="tabbar">
         <button class="tbb active" onclick="eTab('list',this)">Produtos</button>
         <button class="tbb" onclick="eTab('add',this)" id="tab-add-prod">Adicionar</button>
-        <button class="tbb" onclick="eTab('alert',this)">Alertas</button>
+        <button class="tbb" onclick="eTab('forn',this)">🏪 Fornecedores</button>
         <button class="tbb" onclick="eTab('mov',this)">📋 Histórico</button>
       </div>
       <div id="est-list"><div id="prod-list"></div></div>
+      <div id="est-forn" style="display:none">
+        <button class="btn btn-p btn-bl" style="margin-bottom:12px" onclick="openModal('m-forn-novo')">+ Novo fornecedor</button>
+        <div id="forn-list"></div>
+        <div id="forn-empty" class="empty" style="display:none"><div class="ei">🏪</div><div class="et">Sem fornecedores</div><div class="es">Cadastre fornecedores para vincular aos produtos</div></div>
+      </div>
       <div id="est-add" style="display:none">
         <div class="card"><div class="card-accent"></div>
           <div class="ct" style="margin-bottom:14px">Novo produto</div>
           <div class="fg"><label>Nome do produto</label><input id="p-nome" placeholder="Ex: Minhoca Viva 100g"></div>
           <div class="fr">
-            <div class="fg"><label>Qtd. estoque</label><input id="p-qtd" type="number" placeholder="0" min="0"></div>
+            <div class="fg"><label>Qtd. estoque</label><input id="p-qtd" type="number" placeholder="0" min="0" oninput="calcCustoTotal()"></div>
             <div class="fg"><label>Qtd. mínima</label><input id="p-min" type="number" placeholder="5" min="0"></div>
           </div>
           <div class="fg"><label>Preço de venda (R$)</label><input id="p-preco" type="number" placeholder="0,00" step="0.01" min="0"></div>
+          <div class="fg"><label>Fornecedor (opcional)</label><select id="p-forn"><option value="">Sem fornecedor</option></select></div>
           <div class="stitle">Custo</div>
           <div class="tabbar" style="margin-bottom:10px">
             <button class="tbb active" id="ct1" onclick="custoMode(1)">Unitário</button>
             <button class="tbb" id="ct2" onclick="custoMode(2)">Por lote</button>
           </div>
-          <div id="cm1"><div class="fg"><label>Custo unitário (R$)</label><input id="p-custo" type="number" placeholder="0,00" step="0.01" min="0"></div></div>
+          <div id="cm1"><div class="fg"><label>Custo unitário (R$)</label><input id="p-custo" type="number" placeholder="0,00" step="0.01" min="0" oninput="calcCustoTotal()"></div></div>
           <div id="cm2" style="display:none">
             <div class="fr">
-              <div class="fg"><label>Total gasto (R$)</label><input id="p-lt" type="number" placeholder="0,00" step="0.01" oninput="calcCusto()"></div>
-              <div class="fg"><label>Qtd. lote</label><input id="p-lq" type="number" placeholder="0" oninput="calcCusto()"></div>
+              <div class="fg"><label>Total gasto (R$)</label><input id="p-lt" type="number" placeholder="0,00" step="0.01" oninput="calcCusto();calcCustoTotal()"></div>
+              <div class="fg"><label>Qtd. lote</label><input id="p-lq" type="number" placeholder="0" oninput="calcCusto();calcCustoTotal()"></div>
             </div>
             <div class="fg"><label>Custo calculado</label><input id="p-cc" readonly placeholder="—" style="color:var(--r3);font-weight:700;font-family:var(--mo)"></div>
           </div>
-          <button class="btn btn-p btn-bl" style="margin-top:10px" onclick="addProduto()">Salvar produto</button>
+          <div class="fg" style="margin-top:4px">
+            <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:10px;padding:11px 13px;border:1px solid var(--bd3)">
+              <div><div style="font-size:12px;font-weight:600;color:var(--tx2)">Custo total do lote</div><div style="font-size:11px;color:var(--tx4)">custo unit. × qtd. estoque</div></div>
+              <div style="font-size:16px;font-weight:700;color:var(--r3);font-family:var(--mo)" id="p-custo-total">R$ 0,00</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 13px;background:var(--bg3);border-radius:10px;border:1px solid var(--bd3);margin-bottom:10px">
+            <div><div style="font-size:13px;font-weight:600;color:var(--tx2)">Pago ao fornecedor</div><div style="font-size:11px;color:var(--tx4)">Custo já foi pago</div></div>
+            <div id="p-pago-toggle" onclick="togglePagoProd('p')" style="width:44px;height:24px;background:var(--g);border-radius:12px;position:relative;cursor:pointer;transition:all .3s">
+              <div style="width:20px;height:20px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px;transition:all .3s"></div>
+            </div>
+          </div>
+          <div id="p-venc-box" style="display:none;margin-bottom:10px">
+            <div class="fg"><label style="color:var(--a)">Data de vencimento (obrigatório)</label><input type="date" id="p-venc" class="cal-input" style="border-color:var(--a)"></div>
+          </div>
+          <button class="btn btn-p btn-bl" style="margin-top:4px" onclick="addProduto()">Salvar produto</button>
         </div>
       </div>
-      <div id="est-alert" style="display:none"><div id="alert-list"></div></div>
       <div id="est-mov" style="display:none">
         <div class="tabbar" style="margin-bottom:10px;font-size:11px">
           <button class="tbb active" onclick="movFiltro('todos',this)">Todos</button>
@@ -720,6 +740,7 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
         <div class="fg"><label>Preço venda (R$)</label><input id="ep-preco" type="number" step="0.01" min="0"></div>
         <div class="fg"><label>Custo (R$)</label><input id="ep-custo" type="number" step="0.01" min="0"></div>
       </div>
+      <div class="fg"><label>Fornecedor (opcional)</label><select id="ep-forn"><option value="">Sem fornecedor</option></select></div>
       <button class="btn btn-p btn-bl" style="margin-top:10px" onclick="salvarEditProd()">Salvar alterações</button>
       <button class="btn btn-d btn-bl" style="margin-top:8px" onclick="excluirProd()">Excluir produto</button>
     </div>
@@ -867,6 +888,63 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
       <div class="fg"><label>Limite de usos (0 = ilimitado)</label><input id="cup-lim" type="number" placeholder="0" min="0"></div>
       <div class="fg"><label>Comissão % (opcional — 0 = sem comissão)</label><input id="cup-comm" type="number" placeholder="0" min="0" max="100" step="0.5"></div>
       <button class="btn btn-p btn-bl" style="margin-top:10px" onclick="salvarCupom()" id="btn-cup">Criar cupom</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NOVO FORNECEDOR -->
+<div class="mov" id="m-forn-novo">
+  <div class="msh"><div class="mhan"></div>
+    <div class="mhdr"><div class="mtit" id="m-forn-tit">Novo fornecedor</div><button class="btn btn-g btn-sm" onclick="closeModal('m-forn-novo')">Fechar</button></div>
+    <div class="mbdy">
+      <div class="fg"><label>Nome ★</label><input id="forn-nome" placeholder="Ex: Japa Iscas"></div>
+      <div class="fg"><label>WhatsApp</label><input id="forn-tel" placeholder="(11) 99999-9999" type="tel"></div>
+      <div class="fg"><label>CPF / CNPJ</label><input id="forn-doc" placeholder="00.000.000/0001-00"></div>
+      <div class="fg"><label>Endereço</label><input id="forn-end" placeholder="Rua, número, bairro"></div>
+      <button class="btn btn-p btn-bl" onclick="salvarFornecedor()">Salvar fornecedor</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL FORNECEDOR DETALHE -->
+<div class="mov" id="m-forn-det">
+  <div class="msh"><div class="mhan"></div>
+    <div class="mhdr">
+      <div><div class="mtit" id="m-forn-nome">Fornecedor</div><div style="font-size:11px;color:var(--tx3)" id="m-forn-info"></div></div>
+      <button class="btn btn-g btn-sm" onclick="closeModal('m-forn-det')">Fechar</button>
+    </div>
+    <div class="mbdy">
+      <div class="tabbar">
+        <button class="tbb active" onclick="fornTab('dividas',this)">Dívidas</button>
+        <button class="tbb" onclick="fornTab('roi',this)">ROI</button>
+        <button class="tbb" onclick="fornTab('hist',this)">Histórico</button>
+      </div>
+      <div id="forn-dividas">
+        <div id="forn-div-list"></div>
+        <div id="forn-div-empty" class="empty" style="display:none"><div class="ei">✅</div><div class="et">Sem dívidas!</div></div>
+        <div id="forn-div-total" style="display:none;margin-top:10px" class="tbox">
+          <span class="tbox-l">Total em dívidas</span>
+          <span class="tbox-v" id="forn-div-tot" style="color:var(--a)">R$ 0,00</span>
+        </div>
+      </div>
+      <div id="forn-roi" style="display:none">
+        <div class="metrics">
+          <div class="met"><div class="met-ac" style="background:var(--r3)"></div><div class="ml">Custo total pago</div><div class="mv" style="color:var(--r3)" id="forn-roi-custo">0,00</div><div class="ms">R$</div></div>
+          <div class="met"><div class="met-ac" style="background:var(--g)"></div><div class="ml">Vendas geradas</div><div class="mv" style="color:var(--g)" id="forn-roi-vendas">0,00</div><div class="ms">R$</div></div>
+        </div>
+        <div class="card"><div class="card-accent"></div>
+          <div class="tbox"><span class="tbox-l">Lucro líquido</span><span class="tbox-v" id="forn-roi-lucro">R$ 0,00</span></div>
+          <div class="tr" style="margin-top:8px"><span class="tr-l">ROI</span><span class="tr-v" id="forn-roi-pct">0%</span></div>
+        </div>
+      </div>
+      <div id="forn-hist" style="display:none">
+        <div id="forn-hist-list"></div>
+        <div id="forn-hist-empty" class="empty" style="display:none"><div class="ei">📋</div><div class="et">Sem pagamentos</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-g btn-bl btn-sm" onclick="gerarReciboPDF()">📄 Recibo PDF</button>
+        <button class="btn btn-d btn-bl btn-sm" onclick="excluirFornecedor()">🗑️ Excluir</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1112,7 +1190,8 @@ async function sbRpc(fn, params = {}) {
 // STATE
 // ══════════════════════════════════════
 var me=null, empresa=null;
-var users=[], produtos=[], clientes=[], pedidos=[], historico=[], cupons=[], despesas=[], entradas=[], movEstoque=[];
+var users=[], produtos=[], clientes=[], pedidos=[], historico=[], cupons=[], despesas=[], entradas=[], movEstoque=[], fornecedores=[];
+var _prodPago=true, _editFornId=null;
 var pendingSync=[];
 var dashPeriod='mes', relPeriod='mes', cxPeriod='mes', histPeriod='mes', entPeriod='mes', despPeriod='mes';
 var isOnline=navigator.onLine;
@@ -1283,7 +1362,7 @@ async function syncNow(manual){
   if(!empresa)return;
   var eid=empresa.id;
   try{
-    var [u,p,cl,ped,his,cup,ent,desp,mov]=await Promise.all([
+    var [u,p,cl,ped,his,cup,ent,desp,mov,forn]=await Promise.all([
       sbFetch('usuarios?empresa_id=eq.'+eid+'&select=*'),
       sbFetch('produtos?empresa_id=eq.'+eid+'&select=*'),
       sbFetch('clientes?empresa_id=eq.'+eid+'&select=*'),
@@ -1292,7 +1371,8 @@ async function syncNow(manual){
       sbFetch('cupons?empresa_id=eq.'+eid+'&select=*'),
       sbFetch('entradas?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc'),
       sbFetch('despesas?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc'),
-      sbFetch('mov_estoque?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc&limit=500').catch(function(){return []})
+      sbFetch('mov_estoque?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc&limit=500').catch(function(){return []}),
+      sbFetch('fornecedores?empresa_id=eq.'+eid+'&select=*').catch(function(){return []})
     ]);
     users=u||[];
     // para cada tabela: manter itens locais que ainda não chegaram ao banco e reenviar
@@ -1311,6 +1391,7 @@ async function syncNow(manual){
     cupons    = mergeEReenviar(cup, cupons,     'cupons');
     entradas  = mergeEReenviar(ent, entradas,   'entradas');
     despesas  = mergeEReenviar(desp,despesas,   'despesas');
+    fornecedores = mergeEReenviar(forn, fornecedores, 'fornecedores');
     // filtrar pedidos que ja foram para o historico
     var histIds=new Set((his||[]).map(h=>String(h.id)));
     var pedFiltrados=(ped||[]).filter(p=>!histIds.has(String(p.id)));
@@ -1324,7 +1405,7 @@ async function syncNow(manual){
     });
     historico=his||[];
     movEstoque=mov||[];
-    LS.s('data_'+eid,{users,produtos,clientes,pedidos,historico,cupons,entradas,despesas,movEstoque,ts:Date.now()});
+    LS.s('data_'+eid,{users,produtos,clientes,pedidos,historico,cupons,entradas,despesas,movEstoque,fornecedores,ts:Date.now()});
     isOnline=true;
     setDot('online');
     // atualizar nome da empresa na topbar
@@ -1335,7 +1416,7 @@ async function syncNow(manual){
   }catch(e){
     setDot('offline');
     var cache=LS.g('data_'+eid);
-    if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[];movEstoque=cache.movEstoque||[]}
+    if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[];movEstoque=cache.movEstoque||[];fornecedores=cache.fornecedores||[]}
     renderAll();
   }
 }
@@ -2539,6 +2620,9 @@ function editProduto(id){
   document.getElementById('ep-min').value=p.minimo;
   document.getElementById('ep-preco').value=p.preco;
   document.getElementById('ep-custo').value=p.custo;
+  populateFornSelects();
+  var sel=document.getElementById('ep-forn');
+  if(sel)sel.value=p.fornecedor_id||'';
   openModal('m-edit-prod');
 }
 
@@ -2549,6 +2633,8 @@ function salvarEditProd(){
   p.minimo=parseInt(document.getElementById('ep-min').value)||0;
   p.preco=parseFloat(document.getElementById('ep-preco').value)||p.preco;
   p.custo=parseFloat(document.getElementById('ep-custo').value)||0;
+  var fSel=document.getElementById('ep-forn');
+  p.fornecedor_id=fSel?(fSel.value||null):p.fornecedor_id;
   dbSave('produtos',p);
   toast('Produto atualizado! 📦','ok');closeModal('m-edit-prod');renderEstoque();
 }
@@ -2567,13 +2653,36 @@ function addProduto(){
   var min=parseInt(document.getElementById('p-min').value)||0;
   var preco=parseFloat(document.getElementById('p-preco').value)||0;
   var custo=parseFloat(document.getElementById('p-cc').value||document.getElementById('p-custo').value)||0;
+  var fornId=document.getElementById('p-forn')?document.getElementById('p-forn').value:'';
+  var venc=document.getElementById('p-venc')?document.getElementById('p-venc').value:'';
   if(!nome){toast('Informe o nome do produto','err');return}
   if(!preco){toast('Informe o preço de venda','err');return}
-  var np={id:uid(),empresa_id:empresa.id,nome,preco,custo,qtd,minimo:min};
+  if(!_prodPago&&!venc){toast('Informe a data de vencimento','err');return}
+  var custoTotal=custo*qtd;
+  var np={id:uid(),empresa_id:empresa.id,nome,preco,custo,qtd,minimo:min,
+    fornecedor_id:fornId||null,pago:_prodPago,custo_total:custoTotal,
+    data_vencimento:_prodPago?null:venc};
   produtos.push(np);dbSave('produtos',np);
-  document.getElementById('p-nome').value='';document.getElementById('p-qtd').value='';
-  document.getElementById('p-preco').value='';document.getElementById('p-custo').value='';document.getElementById('p-cc').value='';
-  toast('Produto adicionado! 📦','ok');
+  // se pago, gerar despesa automatica no caixa
+  if(_prodPago&&custoTotal>0){
+    var forn=fornecedores.find(f=>String(f.id)===String(fornId));
+    var nd={id:uid(),empresa_id:empresa.id,
+      descricao:'Compra: '+nome+(forn?' — '+forn.nome:''),
+      valor:custoTotal,categoria:'Fornecedor/Estoque',
+      fornecedor_id:fornId||null,pago:true,
+      criado_por:me?me.id:null,criado_em:Date.now()};
+    despesas.unshift(nd);dbSave('despesas',nd);
+    toast('Produto adicionado! Despesa gerada no caixa 📦','ok');
+  }else{
+    toast('Produto adicionado! 📦','ok');
+  }
+  // reset form
+  ['p-nome','p-qtd','p-preco','p-custo','p-cc','p-venc','p-lt','p-lq'].forEach(function(id){var el=document.getElementById(id);if(el)el.value=''});
+  var ct=document.getElementById('p-custo-total');if(ct)ct.textContent='R$ 0,00';
+  _prodPago=true;
+  var toggle=document.getElementById('p-pago-toggle');
+  if(toggle){toggle.style.background='var(--g)';var dot=toggle.querySelector('div');if(dot){dot.style.right='2px';dot.style.left='auto';}}
+  var vencBox=document.getElementById('p-venc-box');if(vencBox)vencBox.style.display='none';
   eTab('list',document.querySelector('#sc-estoque .tbb'));renderEstoque();
 }
 
@@ -2591,11 +2700,240 @@ function custoMode(m){
 }
 
 function eTab(t,el){
-  ['list','add','alert','mov'].forEach(function(x){var n=document.getElementById('est-'+x);if(n)n.style.display='none'});
+  ['list','add','forn','mov'].forEach(function(x){var n=document.getElementById('est-'+x);if(n)n.style.display='none'});
   var node=document.getElementById('est-'+t);if(node)node.style.display='block';
   document.querySelectorAll('#sc-estoque .tbb').forEach(b=>b.classList.remove('active'));
   if(el)el.classList.add('active');
-  if(t==='mov'){renderMov()}else{renderEstoque()}
+  if(t==='mov')renderMov();
+  else if(t==='forn')renderFornecedores();
+  else if(t==='add')populateFornSelects();
+  else renderEstoque();
+}
+
+// ══════════════════════════════════════
+// FORNECEDORES
+// ══════════════════════════════════════
+function togglePagoProd(prefix){
+  _prodPago=!_prodPago;
+  var toggle=document.getElementById(prefix+'-pago-toggle');
+  var vencBox=document.getElementById(prefix+'-venc-box');
+  if(toggle){
+    toggle.style.background=_prodPago?'var(--g)':'var(--a)';
+    var dot=toggle.querySelector('div');
+    if(dot){dot.style.right=_prodPago?'2px':'auto';dot.style.left=_prodPago?'auto':'2px';}
+  }
+  if(vencBox)vencBox.style.display=_prodPago?'none':'block';
+}
+
+function calcCustoTotal(){
+  var custo=parseFloat((document.getElementById('p-cc')||{}).value||(document.getElementById('p-custo')||{}).value)||0;
+  var qtd=parseInt((document.getElementById('p-qtd')||{}).value)||0;
+  var total=custo*qtd;
+  var el=document.getElementById('p-custo-total');
+  if(el)el.textContent='R$ '+total.toFixed(2).replace('.',',');
+}
+
+function populateFornSelects(){
+  ['p-forn','ep-forn'].forEach(function(id){
+    var sel=document.getElementById(id);
+    if(!sel)return;
+    var cur=sel.value;
+    sel.innerHTML='<option value="">Sem fornecedor</option>'+
+      fornecedores.map(function(f){return '<option value="'+f.id+'">'+f.nome+'</option>'}).join('');
+    if(cur)sel.value=cur;
+  });
+}
+
+function renderFornecedores(){
+  populateFornSelects();
+  var list=document.getElementById('forn-list');
+  var empty=document.getElementById('forn-empty');
+  if(!list)return;
+  if(!fornecedores.length){
+    list.innerHTML='';
+    if(empty)empty.style.display='block';
+    return;
+  }
+  if(empty)empty.style.display='none';
+  var hoje=new Date();hoje.setHours(0,0,0,0);
+  list.innerHTML=fornecedores.map(function(f){
+    var prodsForn=produtos.filter(function(p){return String(p.fornecedor_id)===String(f.id)&&!isTrue(p.pago)});
+    var totalDiv=prodsForn.reduce(function(a,p){return a+(parseFloat(p.custo_total)||0)},0);
+    var vencido=prodsForn.some(function(p){if(!p.data_vencimento)return false;return new Date(p.data_vencimento)<hoje});
+    var cor=totalDiv>0?(vencido?'rgba(185,28,28,.15)':'rgba(245,158,11,.12)'):'transparent';
+    var borda=totalDiv>0?(vencido?'rgba(185,28,28,.4)':'rgba(245,158,11,.4)'):'var(--bd2)';
+    var badge=totalDiv>0?(vencido?
+      '<span class="b br">🔴 Vencido '+fmt(totalDiv)+'</span>':
+      '<span class="b ba">🟡 Deve '+fmt(totalDiv)+'</span>'):
+      '<span class="b bg">✅ Em dia</span>';
+    return '<div class="card" style="cursor:pointer;background:'+cor+';border:1px solid '+borda+'" onclick="abrirFornecedor(\''+f.id+'\')">'+
+      '<div class="card-accent"></div>'+
+      '<div class="ch">'+
+        '<div style="display:flex;align-items:center;gap:10px">'+
+          '<div class="av" style="width:36px;height:36px;font-size:12px">'+ini(f.nome)+'</div>'+
+          '<div><div class="ct">'+f.nome+'</div><div class="cs">'+(f.whatsapp?f.whatsapp:'Sem WhatsApp')+(f.cpf_cnpj?' · '+f.cpf_cnpj:'')+'</div></div>'+
+        '</div>'+
+        badge+
+      '</div></div>';
+  }).join('');
+}
+
+function salvarFornecedor(){
+  var nome=document.getElementById('forn-nome').value.trim();
+  if(!nome){toast('Informe o nome','err');return}
+  var nf={id:uid(),empresa_id:empresa.id,nome,
+    whatsapp:document.getElementById('forn-tel').value.trim(),
+    cpf_cnpj:document.getElementById('forn-doc').value.trim(),
+    endereco:document.getElementById('forn-end').value.trim(),
+    criado_em:Date.now()};
+  fornecedores.push(nf);
+  if(empresa){var cache=LS.g('data_'+empresa.id)||{};cache.fornecedores=fornecedores;LS.s('data_'+empresa.id,cache);}
+  dbSave('fornecedores',nf);
+  ['forn-nome','forn-tel','forn-doc','forn-end'].forEach(function(id){var el=document.getElementById(id);if(el)el.value=''});
+  toast('Fornecedor salvo! 🏪','ok');
+  closeModal('m-forn-novo');renderFornecedores();
+}
+
+function abrirFornecedor(id){
+  var f=fornecedores.find(x=>String(x.id)===String(id));if(!f)return;
+  _editFornId=id;
+  document.getElementById('m-forn-nome').textContent=f.nome;
+  document.getElementById('m-forn-info').textContent=[f.whatsapp,f.cpf_cnpj].filter(Boolean).join(' · ')||'Sem contato';
+  fornTab('dividas',null);
+  openModal('m-forn-det');
+}
+
+function fornTab(t,el){
+  ['dividas','roi','hist'].forEach(function(x){var e=document.getElementById('forn-'+x);if(e)e.style.display='none'});
+  var show=document.getElementById('forn-'+t);if(show)show.style.display='block';
+  document.querySelectorAll('#m-forn-det .tbb').forEach(b=>b.classList.remove('active'));
+  if(el)el.classList.add('active');
+  else{var tabs=document.querySelectorAll('#m-forn-det .tbb');if(tabs[0])tabs[0].classList.add('active');}
+  if(t==='dividas')renderFornDividas();
+  else if(t==='roi')renderFornROI();
+  else if(t==='hist')renderFornHist();
+}
+
+function renderFornDividas(){
+  var f=fornecedores.find(x=>String(x.id)===String(_editFornId));if(!f)return;
+  var hoje=new Date();hoje.setHours(0,0,0,0);
+  var prodsForn=produtos.filter(function(p){return String(p.fornecedor_id)===String(f.id)&&!isTrue(p.pago)});
+  var list=document.getElementById('forn-div-list');
+  var empty=document.getElementById('forn-div-empty');
+  var totalBox=document.getElementById('forn-div-total');
+  if(!prodsForn.length){
+    if(list)list.innerHTML='';
+    if(empty)empty.style.display='block';
+    if(totalBox)totalBox.style.display='none';
+    return;
+  }
+  if(empty)empty.style.display='none';
+  var totalDiv=prodsForn.reduce(function(a,p){return a+(parseFloat(p.custo_total)||0)},0);
+  if(totalBox){totalBox.style.display='flex';document.getElementById('forn-div-tot').textContent=fmt(totalDiv);}
+  if(list)list.innerHTML=prodsForn.map(function(p){
+    var venc=p.data_vencimento?new Date(p.data_vencimento):null;
+    var vencido=venc&&venc<hoje;
+    var cor=vencido?'rgba(185,28,28,.12)':'rgba(245,158,11,.12)';
+    var borda=vencido?'rgba(185,28,28,.35)':'rgba(245,158,11,.35)';
+    var dataStr=venc?venc.toLocaleDateString('pt-BR'):'Sem vencimento';
+    return '<div class="card" style="background:'+cor+';border:1px solid '+borda+';margin-bottom:8px">'+
+      '<div class="ch">'+
+        '<div><div class="ct">'+p.nome+'</div><div class="cs">'+(vencido?'🔴 Venceu':'🟡 Vence')+' '+dataStr+'</div></div>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<div style="font-size:16px;font-weight:700;font-family:var(--mo);color:'+(vencido?'var(--r3)':'var(--a)')+'">'+fmt(p.custo_total||0)+'</div>'+
+          '<button class="btn btn-s btn-sm" onclick="pagarFornecedor(\''+p.id+'\')">Pagar</button>'+
+        '</div>'+
+      '</div></div>';
+  }).join('');
+}
+
+function renderFornROI(){
+  var f=fornecedores.find(x=>String(x.id)===String(_editFornId));if(!f)return;
+  var prodsForn=produtos.filter(function(p){return String(p.fornecedor_id)===String(f.id)});
+  var custoPago=prodsForn.filter(function(p){return isTrue(p.pago)}).reduce(function(a,p){return a+(parseFloat(p.custo_total)||0)},0);
+  var vendas=0;
+  historico.forEach(function(h){
+    parseItens(h.itens).forEach(function(it){
+      var prod=prodsForn.find(function(p){return String(p.id)===String(it.prodId||it.id)});
+      if(prod&&isTrue(h.pago))vendas+=parseFloat(it.total)||0;
+    });
+  });
+  var lucro=vendas-custoPago;
+  var roi=custoPago>0?((lucro/custoPago)*100):0;
+  var elC=document.getElementById('forn-roi-custo');if(elC)elC.textContent=fmtN(custoPago);
+  var elV=document.getElementById('forn-roi-vendas');if(elV)elV.textContent=fmtN(vendas);
+  var elL=document.getElementById('forn-roi-lucro');if(elL){elL.textContent=fmt(lucro);elL.style.color=lucro>=0?'var(--g)':'var(--r3)';}
+  var elR=document.getElementById('forn-roi-pct');if(elR){elR.textContent=roi.toFixed(1)+'%';elR.style.color=roi>=0?'var(--g)':'var(--r3)';}
+}
+
+function renderFornHist(){
+  var list=document.getElementById('forn-hist-list');
+  var empty=document.getElementById('forn-hist-empty');
+  var pagamentos=despesas.filter(function(d){return String(d.fornecedor_id)===String(_editFornId)&&isTrue(d.pago)});
+  if(!pagamentos.length){if(list)list.innerHTML='';if(empty)empty.style.display='block';return;}
+  if(empty)empty.style.display='none';
+  if(list)list.innerHTML=pagamentos.map(function(d){
+    var ts=parseInt(d.criado_em)||Date.now();
+    var data=new Date(ts).toLocaleDateString('pt-BR');
+    return '<div class="card"><div class="card-accent"></div>'+
+      '<div class="ch">'+
+        '<div><div class="ct">'+d.descricao+'</div><div class="cs">'+data+'</div></div>'+
+        '<div style="font-size:15px;font-weight:700;color:var(--r3);font-family:var(--mo)">'+fmt(d.valor)+'</div>'+
+      '</div></div>';
+  }).join('');
+}
+
+function pagarFornecedor(prodId){
+  var p=produtos.find(x=>String(x.id)===String(prodId));if(!p)return;
+  p.pago=true;
+  p.data_vencimento=null;
+  dbSave('produtos',p);
+  var nd={id:uid(),empresa_id:empresa.id,descricao:'Compra: '+p.nome,valor:parseFloat(p.custo_total)||0,
+    categoria:'Fornecedor/Estoque',fornecedor_id:_editFornId,pago:true,criado_por:me?me.id:null,criado_em:Date.now()};
+  despesas.unshift(nd);dbSave('despesas',nd);
+  toast('Pago! Despesa gerada automaticamente ✅','ok');
+  renderFornDividas();if(typeof renderCaixa==='function')renderCaixa();
+}
+
+function excluirFornecedor(){
+  if(!_editFornId)return;
+  var f=fornecedores.find(x=>String(x.id)===String(_editFornId));if(!f)return;
+  if(!confirm('Excluir "'+f.nome+'"?'))return;
+  fornecedores=fornecedores.filter(x=>String(x.id)!==String(_editFornId));
+  if(empresa){var cache=LS.g('data_'+empresa.id)||{};cache.fornecedores=fornecedores;LS.s('data_'+empresa.id,cache);}
+  dbDelete('fornecedores',_editFornId);
+  toast('Fornecedor removido 🗑️','warn');
+  closeModal('m-forn-det');renderFornecedores();
+}
+
+function gerarReciboPDF(){
+  var f=fornecedores.find(x=>String(x.id)===String(_editFornId));if(!f)return;
+  var emp=empresa||{};
+  var pagamentos=despesas.filter(function(d){return String(d.fornecedor_id)===String(_editFornId)&&isTrue(d.pago)});
+  var total=pagamentos.reduce(function(a,d){return a+(parseFloat(d.valor)||0)},0);
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'+
+    'body{font-family:sans-serif;font-size:13px;padding:24px;max-width:600px;margin:0 auto}'+
+    '.header{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px}'+
+    '.title{font-size:18px;font-weight:700}'+
+    'table{width:100%;border-collapse:collapse;margin:12px 0}'+
+    'th{text-align:left;padding:6px 0;border-bottom:1px solid #000;font-size:11px}'+
+    'td{padding:5px 0;border-bottom:1px dashed #ddd;font-size:12px}'+
+    '.total{display:flex;justify-content:space-between;font-size:16px;font-weight:700;padding:10px 0;border-top:2px solid #000;margin-top:8px}'+
+    '</style></head><body>'+
+    '<div class="header">'+
+      '<div><div class="title">'+(emp.razao_social||emp.nome||'NS Estoque Pro')+'</div><div style="font-size:11px;color:#555">'+[emp.cpf_cnpj,emp.telefone].filter(Boolean).join(' · ')+'</div></div>'+
+      '<div style="text-align:right"><div style="font-weight:700">RECIBO FORNECEDOR</div><div style="font-size:11px;color:#555">'+new Date().toLocaleDateString('pt-BR')+'</div></div>'+
+    '</div>'+
+    '<div style="margin-bottom:14px"><strong>'+f.nome+'</strong>'+(f.cpf_cnpj?' · CNPJ/CPF: '+f.cpf_cnpj:'')+(f.whatsapp?'<br>'+f.whatsapp:'')+'</div>'+
+    '<table>'+
+      '<thead><tr><th>Descrição</th><th>Data</th><th style="text-align:right">Valor</th></tr></thead>'+
+      '<tbody>'+pagamentos.map(function(d){return '<tr><td>'+d.descricao+'</td><td>'+new Date(parseInt(d.criado_em)||Date.now()).toLocaleDateString('pt-BR')+'</td><td style="text-align:right">R$ '+parseFloat(d.valor||0).toFixed(2).replace('.',',')+'</td></tr>'}).join('')+'</tbody>'+
+    '</table>'+
+    '<div class="total"><span>TOTAL PAGO</span><span>R$ '+total.toFixed(2).replace('.',',')+'</span></div>'+
+    (emp.rodape?'<div style="text-align:center;margin-top:20px;font-size:11px;color:#888">'+emp.rodape+'</div>':'')+
+    '</body></html>';
+  if(typeof abrirJanelaPDF==='function')abrirJanelaPDF(html);
+  else{var w=window.open('','_blank');if(w){w.document.write(html);w.document.close();setTimeout(function(){w.print()},400)}}
 }
 
 // ══════════════════════════════════════
@@ -3895,7 +4233,7 @@ var loadTimeout=setTimeout(function(){
       var upn=document.getElementById('upill-name');
       if(upn&&me.nome)upn.textContent=me.nome.split(' ')[0];
       var cache=LS.g('data_'+empresa.id);
-      if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[];movEstoque=cache.movEstoque||[]}
+      if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[];movEstoque=cache.movEstoque||[];fornecedores=cache.fornecedores||[]}
       setupNav();renderAll();
       if(can('dash'))goTo('dash',document.querySelector('.nb'),'Painel');
       else goTo('pedidos',document.querySelectorAll('.nb')[1],'Pedidos');
