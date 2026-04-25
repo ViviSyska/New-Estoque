@@ -399,6 +399,7 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
         <button class="tbb active" onclick="eTab('list',this)">Produtos</button>
         <button class="tbb" onclick="eTab('add',this)" id="tab-add-prod">Adicionar</button>
         <button class="tbb" onclick="eTab('alert',this)">Alertas</button>
+        <button class="tbb" onclick="eTab('mov',this)">📋 Histórico</button>
       </div>
       <div id="est-list"><div id="prod-list"></div></div>
       <div id="est-add" style="display:none">
@@ -427,6 +428,14 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
         </div>
       </div>
       <div id="est-alert" style="display:none"><div id="alert-list"></div></div>
+      <div id="est-mov" style="display:none">
+        <div class="tabbar" style="margin-bottom:10px;font-size:11px">
+          <button class="tbb active" onclick="movFiltro('todos',this)">Todos</button>
+          <button class="tbb" onclick="movFiltro('saida',this)">Saídas</button>
+          <button class="tbb" onclick="movFiltro('devolucao',this)">Devoluções</button>
+        </div>
+        <div id="mov-list"></div>
+      </div>
     </div>
 
     <!-- CAIXA -->
@@ -1103,7 +1112,7 @@ async function sbRpc(fn, params = {}) {
 // STATE
 // ══════════════════════════════════════
 var me=null, empresa=null;
-var users=[], produtos=[], clientes=[], pedidos=[], historico=[], cupons=[], despesas=[], entradas=[];
+var users=[], produtos=[], clientes=[], pedidos=[], historico=[], cupons=[], despesas=[], entradas=[], movEstoque=[];
 var pendingSync=[];
 var dashPeriod='mes', relPeriod='mes', cxPeriod='mes', histPeriod='mes', entPeriod='mes', despPeriod='mes';
 var isOnline=navigator.onLine;
@@ -1274,7 +1283,7 @@ async function syncNow(manual){
   if(!empresa)return;
   var eid=empresa.id;
   try{
-    var [u,p,cl,ped,his,cup,ent,desp]=await Promise.all([
+    var [u,p,cl,ped,his,cup,ent,desp,mov]=await Promise.all([
       sbFetch('usuarios?empresa_id=eq.'+eid+'&select=*'),
       sbFetch('produtos?empresa_id=eq.'+eid+'&select=*'),
       sbFetch('clientes?empresa_id=eq.'+eid+'&select=*'),
@@ -1282,7 +1291,8 @@ async function syncNow(manual){
       isOnline?sbFetch('historico?empresa_id=eq.'+eid+'&select=*&order=finalizado_em.desc&limit=100'):Promise.resolve(historico),
       sbFetch('cupons?empresa_id=eq.'+eid+'&select=*'),
       sbFetch('entradas?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc'),
-      sbFetch('despesas?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc')
+      sbFetch('despesas?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc'),
+      sbFetch('mov_estoque?empresa_id=eq.'+eid+'&select=*&order=criado_em.desc&limit=500').catch(function(){return []})
     ]);
     users=u||[];
     // para cada tabela: manter itens locais que ainda não chegaram ao banco e reenviar
@@ -1313,7 +1323,8 @@ async function syncNow(manual){
       dbSave('pedidos',p);
     });
     historico=his||[];
-    LS.s('data_'+eid,{users,produtos,clientes,pedidos,historico,cupons,entradas,despesas,ts:Date.now()});
+    movEstoque=mov||[];
+    LS.s('data_'+eid,{users,produtos,clientes,pedidos,historico,cupons,entradas,despesas,movEstoque,ts:Date.now()});
     isOnline=true;
     setDot('online');
     // atualizar nome da empresa na topbar
@@ -1324,7 +1335,7 @@ async function syncNow(manual){
   }catch(e){
     setDot('offline');
     var cache=LS.g('data_'+eid);
-    if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[]}
+    if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[];movEstoque=cache.movEstoque||[]}
     renderAll();
   }
 }
@@ -1815,13 +1826,53 @@ function salvarPedido(){
   closeModal('m-pedido');renderAll();
 }
 
+// registra movimentacao no log + banco
+function logMov(tipo, prod, qtd, motivo, pedidoId){
+  if(!empresa||!prod||!qtd)return;
+  var mv={
+    id: uid(),
+    empresa_id: empresa.id,
+    pedido_id: pedidoId||null,
+    produto_id: String(prod.id),
+    produto_nome: prod.nome||'',
+    tipo: tipo, // 'saida' | 'devolucao' | 'ajuste' | 'entrada'
+    qtd: Math.abs(parseInt(qtd)||0),
+    motivo: motivo||'',
+    vendedor_id: me?me.id:null,
+    vendedor_nome: me?me.nome:null,
+    criado_em: Date.now()
+  };
+  movEstoque.unshift(mv);
+  // cache local
+  var cache=LS.g('data_'+empresa.id)||{};
+  cache.movEstoque=movEstoque.slice(0,500);
+  LS.s('data_'+empresa.id,cache);
+  // banco (silencioso se tabela nao existir)
+  try{dbSave('mov_estoque',mv)}catch(e){console.warn('logMov falhou:',e)}
+}
+
 function descontarEstoque(p){
   var its=parseItens(p.itens);
-  its.forEach(it=>{
-    var prod=produtos.find(x=>String(x.id)===String(it.prodId||it.id||''));
+  its.forEach(function(it){
+    var prod=produtos.find(function(x){return String(x.id)===String(it.prodId||it.id||'')});
     if(prod){
-      prod.qtd=Math.max(0,(parseInt(prod.qtd)||0)-(parseInt(it.qtd)||1));
+      var qtd=parseInt(it.qtd)||1;
+      prod.qtd=Math.max(0,(parseInt(prod.qtd)||0)-qtd);
       dbSave('produtos',prod);
+      logMov('saida',prod,qtd,'Entrega comanda #'+String(p.id).slice(-6),p.id);
+    }
+  });
+}
+
+function devolverEstoque(p, motivo){
+  var its=parseItens(p.itens);
+  its.forEach(function(it){
+    var prod=produtos.find(function(x){return String(x.id)===String(it.prodId||it.id||'')});
+    if(prod){
+      var qtd=parseInt(it.qtd)||1;
+      prod.qtd=(parseInt(prod.qtd)||0)+qtd;
+      dbSave('produtos',prod);
+      logMov('devolucao',prod,qtd,motivo||('Devolucao comanda #'+String(p.id).slice(-6)),p.id);
     }
   });
 }
@@ -2416,7 +2467,13 @@ function moverHistorico(p){
 }
 function excluirPedido(id){
   if(!can('editPed')){toast('Sem permissão','err');return}
+  var p=pedidos.find(x=>String(x.id)===String(id));
+  if(!p){return}
   if(!confirm('Excluir esta comanda?'))return;
+  // se ja foi entregue, devolver estoque antes de excluir
+  if(isTrue(p.entregue)||isTrue(p._estoqueDescontado)){
+    devolverEstoque(p,'Exclusao comanda #'+String(p.id).slice(-6));
+  }
   dbDelete('pedidos',id);
   pedidos=pedidos.filter(x=>String(x.id)!==String(id));
   toast('Comanda excluída 🗑️','warn');renderAll();
@@ -2534,10 +2591,55 @@ function custoMode(m){
 }
 
 function eTab(t,el){
-  ['list','add','alert'].forEach(x=>{document.getElementById('est-'+x).style.display='none'});
-  document.getElementById('est-'+t).style.display='block';
+  ['list','add','alert','mov'].forEach(function(x){var n=document.getElementById('est-'+x);if(n)n.style.display='none'});
+  var node=document.getElementById('est-'+t);if(node)node.style.display='block';
   document.querySelectorAll('#sc-estoque .tbb').forEach(b=>b.classList.remove('active'));
-  if(el)el.classList.add('active');renderEstoque();
+  if(el)el.classList.add('active');
+  if(t==='mov'){renderMov()}else{renderEstoque()}
+}
+
+// ══════════════════════════════════════
+// MOVIMENTACOES DE ESTOQUE
+// ══════════════════════════════════════
+var _movFiltro='todos';
+function movFiltro(f,el){
+  _movFiltro=f;
+  document.querySelectorAll('#est-mov .tbb').forEach(b=>b.classList.remove('active'));
+  if(el)el.classList.add('active');
+  renderMov();
+}
+function renderMov(){
+  var box=document.getElementById('mov-list');if(!box)return;
+  var lista=movEstoque||[];
+  if(_movFiltro!=='todos')lista=lista.filter(function(m){return m.tipo===_movFiltro});
+  if(!lista.length){
+    box.innerHTML='<div class="empty"><div class="ei">📋</div><div class="et">Sem movimentações</div><div class="es">As saídas e devoluções aparecem aqui</div></div>';
+    return;
+  }
+  // ordenar por data desc
+  lista=lista.slice().sort(function(a,b){return (b.criado_em||0)-(a.criado_em||0)});
+  box.innerHTML=lista.slice(0,200).map(function(m){
+    var d=new Date(parseInt(m.criado_em)||Date.now());
+    var data=d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    var isDev=m.tipo==='devolucao'||m.tipo==='entrada';
+    var sinal=isDev?'+':'-';
+    var corBg=isDev?'rgba(16,185,129,.08)':'rgba(239,68,68,.08)';
+    var corBorda=isDev?'rgba(16,185,129,.35)':'rgba(239,68,68,.35)';
+    var corTxt=isDev?'#6EE7B7':'#FCA5A5';
+    var emoji=isDev?'⬆️':'⬇️';
+    var pedLink=m.pedido_id?('<span class="chip" style="font-size:10px">📋 #'+String(m.pedido_id).slice(-6)+'</span>'):'';
+    return '<div class="card" style="border:1px solid '+corBorda+';background:'+corBg+';padding:10px 12px;margin-bottom:6px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:2px">'+emoji+' '+(m.produto_nome||'Produto')+'</div>'+
+          '<div style="font-size:11px;color:var(--tx3);line-height:1.4">'+data+(m.vendedor_nome?' · '+m.vendedor_nome:'')+'</div>'+
+          (m.motivo?'<div style="font-size:11px;color:var(--tx4);margin-top:3px">'+m.motivo+'</div>':'')+
+          (pedLink?'<div style="margin-top:5px">'+pedLink+'</div>':'')+
+        '</div>'+
+        '<div style="text-align:right;font-family:var(--mo);font-size:16px;font-weight:700;color:'+corTxt+';white-space:nowrap">'+sinal+(m.qtd||0)+' un</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
 }
 
 // ══════════════════════════════════════
@@ -3091,14 +3193,18 @@ function reabrirComanda(){
       if(empresa){var cC=LS.g('data_'+empresa.id)||{};if(cC.clientes){var iC=cC.clientes.findIndex(x=>String(x.id)===String(cl.id));if(iC>=0)cC.clientes[iC]=cl;LS.s('data_'+empresa.id,cC)}}
     }
   }
-  // reabrir com pagamento totalmente zerado
-  var pr={...p,entregue:false,pago:false,pgto:null,valor_recebido:0,valor_faltando:0,troco:0,credito_usado:0,pendente:false};
+  // DEVOLVER ESTOQUE — itens voltam pra prateleira (registra no log)
+  if(isTrue(p.entregue)||isTrue(p._estoqueDescontado)){
+    devolverEstoque(p,'Reabertura comanda #'+String(p.id).slice(-6));
+  }
+  // reabrir com pagamento totalmente zerado E sinalizando que o estoque foi devolvido
+  var pr={...p,entregue:false,pago:false,pgto:null,valor_recebido:0,valor_faltando:0,troco:0,credito_usado:0,pendente:false,_estoqueDescontado:false};
   historico=historico.filter(x=>String(x.id)!==String(p.id));
   pedidos.unshift(pr);
   if(empresa){var cache=LS.g('data_'+empresa.id)||{};cache.pedidos=pedidos;cache.historico=historico;LS.s('data_'+empresa.id,cache);}
   dbSave('pedidos',{...pr,itens:typeof pr.itens==='string'?pr.itens:JSON.stringify(pr.itens)});
   dbDelete('historico',p.id);
-  toast('Comanda reaberta! Pagamento zerado 🔓','ok');closeModal('m-hist');renderAll();
+  toast('Comanda reaberta! Itens devolvidos ao estoque 🔓','ok');closeModal('m-hist');renderAll();
 }
 
 function emitirReciboHist(){var p=window._histP;if(p)abrirRecibo(p)}
@@ -3747,41 +3853,66 @@ function irParaLogin(){
 // limpar cache se URL tiver ?reset
 if(window.location.search.includes('reset')){localStorage.clear();window.location.href=window.location.pathname}
 
-// timeout 6s - se travar no loading vai para login
+// timeout de seguranca 4s - se travar no loading vai direto para login
+function forcarLogin(motivo){
+  console.warn('[init] forcando login:',motivo);
+  var ld=document.getElementById('ldscr');
+  var ls=document.getElementById('lscr');
+  var as=document.getElementById('auth-scr');
+  if(ld)ld.classList.add('hidden');
+  if(as)as.classList.remove('show');
+  if(ls)ls.classList.remove('hidden');
+}
 var loadTimeout=setTimeout(function(){
   var ld=document.getElementById('ldscr');
-  if(ld&&!ld.classList.contains('hidden')){localStorage.clear();ld.classList.add('hidden');document.getElementById('lscr').classList.remove('hidden')}
-},6000);
+  if(ld&&!ld.classList.contains('hidden')){
+    var as=document.getElementById('auth-scr');
+    // se a tela de auth-callback esta aberta, nao mexer
+    if(as&&as.classList.contains('show'))return;
+    forcarLogin('timeout 4s');
+  }
+},4000);
 
 (async function init(){
-  // verificar se veio de link de email
-  var isAuthCallback=await processarAuthCallback();
-  if(isAuthCallback){clearTimeout(loadTimeout);document.getElementById('ldscr').classList.add('hidden');return}
+  console.log('[init] start');
   try{
+    // verificar se veio de link de email (com timeout proprio de 5s)
+    var isAuthCallback=false;
+    try{
+      isAuthCallback=await Promise.race([
+        processarAuthCallback(),
+        new Promise(function(_,rej){setTimeout(function(){rej(new Error('auth-callback timeout'))},5000)})
+      ]);
+    }catch(e){console.warn('[init] auth callback falhou:',e.message);isAuthCallback=false}
+    if(isAuthCallback){clearTimeout(loadTimeout);var ld0=document.getElementById('ldscr');if(ld0)ld0.classList.add('hidden');return}
+
     var session=LS.g('session');
     if(session&&session.me&&session.empresa){
+      console.log('[init] sessao encontrada');
       me=session.me;empresa=session.empresa;
       clearTimeout(loadTimeout);
       document.getElementById('ldscr').classList.add('hidden');
-      document.getElementById('upill-name').textContent=me.nome.split(' ')[0];
+      var upn=document.getElementById('upill-name');
+      if(upn&&me.nome)upn.textContent=me.nome.split(' ')[0];
       var cache=LS.g('data_'+empresa.id);
-      if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[]}
+      if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[];movEstoque=cache.movEstoque||[]}
       setupNav();renderAll();
       if(can('dash'))goTo('dash',document.querySelector('.nb'),'Painel');
       else goTo('pedidos',document.querySelectorAll('.nb')[1],'Pedidos');
-      syncNow();
+      // sync em background, nao bloqueia UI
+      setTimeout(function(){try{syncNow()}catch(e){console.warn('[init] sync falhou:',e)}},100);
       pendingSync=LS.g('pending')||[];
-      if(pendingSync.length&&isOnline)processPendingSync();
+      if(pendingSync.length&&isOnline){setTimeout(function(){try{processPendingSync()}catch(e){}},200)}
     }else{
+      console.log('[init] sem sessao -> login');
       clearTimeout(loadTimeout);
-      document.getElementById('ldscr').classList.add('hidden');
-      document.getElementById('lscr').classList.remove('hidden');
+      forcarLogin('sem sessao');
     }
   }catch(e){
+    console.error('[init] erro:',e);
     clearTimeout(loadTimeout);
-    localStorage.clear();
-    document.getElementById('ldscr').classList.add('hidden');
-    document.getElementById('lscr').classList.remove('hidden');
+    try{localStorage.clear()}catch(_){}
+    forcarLogin('erro: '+e.message);
   }
 })();
 </script>
