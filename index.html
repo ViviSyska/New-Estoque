@@ -3484,7 +3484,7 @@ function gerarRel(){
   var total=dadosPagos.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
   var totalPend=dadosPend.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
   var despPeriod=despesas.filter(d=>periodFilter(d.criado_em,relPeriod,de,ate)&&!d._motoboy);
-  var entPeriod=entradas.filter(e=>periodFilter(e.criado_em,relPeriod,de,ate));
+  var entPeriod=entradas.filter(e=>periodFilter(e.criado_em,relPeriod,de,ate)&&!e._motoboy);
   var totalDesp=despPeriod.reduce((a,d)=>a+(parseFloat(d.valor)||0),0);
   var totalEnt=entPeriod.reduce((a,e)=>a+(parseFloat(e.valor)||0),0);
   var liquido=total+totalEnt-totalDesp;
@@ -4079,7 +4079,7 @@ function exportarRelPDF(){
   var total=dadosPagos.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
   var totalPend=dadosPend.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
   var despPeriod=despesas.filter(d=>periodFilter(d.criado_em,relPeriod,de,ate)&&!d._motoboy);
-  var entPeriod=entradas.filter(e=>periodFilter(e.criado_em,relPeriod,de,ate));
+  var entPeriod=entradas.filter(e=>periodFilter(e.criado_em,relPeriod,de,ate)&&!e._motoboy);
   var totalDesp=despPeriod.reduce((a,d)=>a+(parseFloat(d.valor)||0),0);
   var totalEnt=entPeriod.reduce((a,e)=>a+(parseFloat(e.valor)||0),0);
   var liquido=total+totalEnt-totalDesp;
@@ -4091,7 +4091,7 @@ function exportarRelPDF(){
   var periodo=relPeriod==='custom'?de+' a '+ate:relPeriod;
 
   function fmtR(v){return'R$ '+parseFloat(v||0).toFixed(2).replace('.',',')}
-  function dtFmt(ts){var d=new Date(parseInt(ts)||ts);return isNaN(d)?'':d.toLocaleDateString('pt-BR');}
+  function dtFmt(ts){if(!ts)return '—';var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||ts);return isNaN(d.getTime())?'—':d.toLocaleDateString('pt-BR');}
 
   // ── linhas de movimentações ──
   var linhasMovs='';
@@ -4102,10 +4102,10 @@ function exportarRelPDF(){
       linhasMovs+=`<tr><td>#${String(p.id).slice(-6)} ${cl?cl.nome:'—'}</td><td>Comanda</td><td>${dtFmt(p.finalizado_em||p.criado_em)}</td><td>${p.pgto||'—'}</td><td style="text-align:right;color:#166534;font-weight:600">+${fmtR(tv)}</td></tr>`;
     });
     entPeriod.forEach(e=>{
-      linhasMovs+=`<tr><td>${e.descricao}</td><td>Entrada</td><td></td><td></td><td style="text-align:right;color:#166534;font-weight:600">+${fmtR(e.valor)}</td></tr>`;
+      linhasMovs+=`<tr><td>${e.descricao}</td><td>Entrada</td><td>${dtFmt(e.criado_em)}</td><td>${e.forma||e.categoria||'—'}</td><td style="text-align:right;color:#166534;font-weight:600">+${fmtR(e.valor)}</td></tr>`;
     });
     despPeriod.forEach(d=>{
-      linhasMovs+=`<tr style="color:#dc2626"><td>${d.descricao}</td><td>Despesa</td><td></td><td></td><td style="text-align:right;font-weight:600">-${fmtR(d.valor)}</td></tr>`;
+      linhasMovs+=`<tr style="color:#dc2626"><td>${d.descricao}</td><td>Despesa</td><td>${dtFmt(d.criado_em)}</td><td>${d.categoria||'—'}</td><td style="text-align:right;font-weight:600">-${fmtR(d.valor)}</td></tr>`;
     });
   } else if(vend){
     dadosPagos.forEach(p=>{
