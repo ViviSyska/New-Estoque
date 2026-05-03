@@ -2608,6 +2608,21 @@ function excluirPedido(id){
   if(isTrue(p.entregue)||isTrue(p._estoqueDescontado)){
     devolverEstoque(p,'Exclusao comanda #'+String(p.id).slice(-6));
   }
+  // remover despesa e entrada de motoboy se existirem
+  var pedIdStr=String(p.id).slice(-6);
+  despesas.filter(d=>d._motoboy&&d.descricao&&d.descricao.includes('#'+pedIdStr)).forEach(d=>{
+    dbDelete('despesas',d.id);
+  });
+  despesas=despesas.filter(d=>!(d._motoboy&&d.descricao&&d.descricao.includes('#'+pedIdStr)));
+  entradas.filter(e=>e._motoboy&&e.descricao&&e.descricao.includes('#'+pedIdStr)).forEach(e=>{
+    dbDelete('entradas',e.id);
+  });
+  entradas=entradas.filter(e=>!(e._motoboy&&e.descricao&&e.descricao.includes('#'+pedIdStr)));
+  // remover credito gerado como troco se houver
+  if(parseFloat(p.troco)>0&&p.cliente_id){
+    var clT=clientes.find(c=>String(c.id)===String(p.cliente_id));
+    if(clT){clT.credito=Math.max(0,(parseFloat(clT.credito)||0)-parseFloat(p.troco));dbSave('clientes',clT);}
+  }
   dbDelete('pedidos',id);
   pedidos=pedidos.filter(x=>String(x.id)!==String(id));
   toast('Comanda excluída 🗑️','warn');renderAll();
@@ -3896,8 +3911,21 @@ function reabrirComanda(){
   if(isTrue(p.entregue)||isTrue(p._estoqueDescontado)){
     devolverEstoque(p,'Reabertura comanda #'+String(p.id).slice(-6));
   }
+  // remover despesa e entrada de motoboy se existirem
+  var pedIdStr=String(p.id).slice(-6);
+  var motoDespId=despesas.find(d=>d._motoboy&&d.descricao&&d.descricao.includes('#'+pedIdStr));
+  var motoEntId=entradas.find(e=>e._motoboy&&e.descricao&&e.descricao.includes('#'+pedIdStr));
+  if(motoDespId){
+    dbDelete('despesas',motoDespId.id);
+    despesas=despesas.filter(x=>String(x.id)!==String(motoDespId.id));
+  }
+  if(motoEntId){
+    dbDelete('entradas',motoEntId.id);
+    entradas=entradas.filter(x=>String(x.id)!==String(motoEntId.id));
+  }
+  if(motoDespId||motoEntId)toast('Taxa motoboy removida','warn');
   // reabrir com pagamento totalmente zerado E sinalizando que o estoque foi devolvido
-  var pr={...p,entregue:false,pago:false,pgto:null,valor_recebido:0,valor_faltando:0,troco:0,credito_usado:0,pendente:false,_estoqueDescontado:false};
+  var pr={...p,entregue:false,pago:false,pgto:null,valor_recebido:0,valor_faltando:0,troco:0,credito_usado:0,pendente:false,_estoqueDescontado:false,motoboy:0,_motoboyVerificado:false};
   historico=historico.filter(x=>String(x.id)!==String(p.id));
   pedidos.unshift(pr);
   if(empresa){var cache=LS.g('data_'+empresa.id)||{};cache.pedidos=pedidos;cache.historico=historico;LS.s('data_'+empresa.id,cache);}
