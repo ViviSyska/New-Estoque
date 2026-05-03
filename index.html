@@ -468,6 +468,7 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
         <button class="tbb" onclick="cxTab('rel',this)">Relatório</button>
       </div>
       <div id="cx-res">
+        <button class="btn btn-p btn-bl" style="margin-bottom:12px" onclick="abrirFecharCaixa()">🔒 Fechar Caixa do Mês</button>
         <div class="period-btns" id="cx-periods">
           <button class="period-btn" onclick="setCxPeriod('hoje',this)">Hoje</button>
           <button class="period-btn" onclick="setCxPeriod('semana',this)">Semana</button>
@@ -949,6 +950,34 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
   </div>
 </div>
 
+<!-- MODAL FECHAR CAIXA -->
+<div class="mov" id="m-fechar-cx">
+  <div class="msh"><div class="mhan"></div>
+    <div class="mhdr"><div class="mtit">🔒 Fechar Caixa</div><button class="btn btn-g btn-sm" onclick="closeModal('m-fechar-cx')">Fechar</button></div>
+    <div class="mbdy">
+      <div id="fcx-resumo" style="margin-bottom:16px"></div>
+      <div class="fg"><label>Fundo de reserva (manter no caixa)</label><input type="number" id="fcx-reserva" placeholder="Ex: 500,00" step="0.01" min="0" oninput="calcFecharCaixa()"></div>
+      <div class="fg"><label>Dividir entre quantas pessoas</label><input type="number" id="fcx-pessoas" value="1" min="1" step="1" oninput="calcFecharCaixa()"></div>
+      <div id="fcx-calc" style="margin-bottom:14px"></div>
+      <button class="btn btn-p btn-bl" onclick="confirmarFechamento()">✅ Confirmar fechamento</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MOTOBOY -->
+<div class="mov" id="m-motoboy">
+  <div class="msh"><div class="mhan"></div>
+    <div class="mhdr"><div class="mtit">Taxa de entrega</div><button class="btn btn-g btn-sm" onclick="closeModal('m-motoboy')">Fechar</button></div>
+    <div class="mbdy">
+      <div style="font-size:13px;color:var(--tx3);margin-bottom:14px">Pedido tipo <strong style="color:var(--tx)">Home</strong> — houve taxa de motoboy?</div>
+      <div class="fg"><label>Valor da taxa (R$)</label><input type="number" id="moto-val" placeholder="0,00" step="0.01" min="0"></div>
+      <div style="font-size:11px;color:var(--tx4);margin-bottom:14px">• Aparecerá na comanda do cliente<br>• Gera despesa automática (saída entregador)<br>• Gera entrada automática (cobrado do cliente)<br>• Não impacta ROI dos produtos</div>
+      <button class="btn btn-p btn-bl" style="margin-bottom:8px" onclick="confirmarMotoboy()">Confirmar com taxa</button>
+      <button class="btn btn-g btn-bl" onclick="confirmarMotoboy(true)">Sem taxa — finalizar</button>
+    </div>
+  </div>
+</div>
+
 <div class="mov" id="m-despesa">
   <div class="msh"><div class="mhan"></div>
     <div class="mhdr"><div class="mtit">Registrar despesa</div><button class="btn btn-g btn-sm" onclick="closeModal('m-despesa')">Fechar</button></div>
@@ -1236,7 +1265,15 @@ function periodFilter(ts,period,de,ate){
   if(isNaN(d.getTime()))return true;
   var now=new Date();
   if(period==='hoje'){var t=new Date();t.setHours(0,0,0,0);return d>=t}
-  if(period==='semana'){var t=new Date();t.setDate(t.getDate()-7);t.setHours(0,0,0,0);return d>=t}
+  if(period==='semana'){
+    // semana fixa: segunda a domingo
+    var hoje=new Date();
+    var diaSemana=hoje.getDay(); // 0=dom, 1=seg...
+    var diasAtrasSegunda=diaSemana===0?6:diaSemana-1;
+    var seg=new Date(hoje);seg.setDate(hoje.getDate()-diasAtrasSegunda);seg.setHours(0,0,0,0);
+    var dom=new Date(seg);dom.setDate(seg.getDate()+6);dom.setHours(23,59,59,999);
+    return d>=seg&&d<=dom;
+  }
   if(period==='mes'){var t=new Date(now.getFullYear(),now.getMonth(),1);return d>=t}
   if(period==='ano'){var t=new Date(now.getFullYear(),0,1);return d>=t}
   if(period==='custom'&&de&&ate){var ds=new Date(de);var dt=new Date(ate);dt.setHours(23,59,59);return d>=ds&&d<=dt}
@@ -2505,6 +2542,12 @@ function pagarPendente(id){
 }
 
 function moverHistorico(p){
+  // verificar motoboy se tipo Home
+  if(p.tipo==='Home'&&!p._motoboyVerificado){
+    p._motoboyVerificado=true;
+    verificarMotoboy(p.id,function(){moverHistorico(p)});
+    return;
+  }
   // verificar estoque antes de finalizar
   var falta=verificarEstoque(p);
   if(falta.length){
@@ -2658,23 +2701,54 @@ function addProduto(){
   if(!nome){toast('Informe o nome do produto','err');return}
   if(!preco){toast('Informe o preço de venda','err');return}
   if(!_prodPago&&!venc){toast('Informe a data de vencimento','err');return}
-  var custoTotal=custo*qtd;
-  var np={id:uid(),empresa_id:empresa.id,nome,preco,custo,qtd,minimo:min,
-    fornecedor_id:fornId||null,pago:_prodPago,custo_total:custoTotal,
-    data_vencimento:_prodPago?null:venc};
-  produtos.push(np);dbSave('produtos',np);
-  // se pago, gerar despesa automatica no caixa
-  if(_prodPago&&custoTotal>0){
-    var forn=fornecedores.find(f=>String(f.id)===String(fornId));
-    var nd={id:uid(),empresa_id:empresa.id,
-      descricao:'Compra: '+nome+(forn?' — '+forn.nome:''),
-      valor:custoTotal,categoria:'Fornecedor/Estoque',
-      fornecedor_id:fornId||null,pago:true,
-      criado_por:me?me.id:null,criado_em:Date.now()};
-    despesas.unshift(nd);dbSave('despesas',nd);
-    toast('Produto adicionado! Despesa gerada no caixa 📦','ok');
+  // verificar duplicidade pelo nome
+  var existente=produtos.find(p=>p.nome.trim().toLowerCase()===nome.toLowerCase());
+  if(existente){
+    // custo medio ponderado
+    var qtdAnt=parseInt(existente.qtd)||0;
+    var custoAnt=parseFloat(existente.custo)||0;
+    var custoMedio=qtdAnt>0||qtd>0?((custoAnt*qtdAnt)+(custo*qtd))/(qtdAnt+qtd):custo;
+        var msg='Este produto ja existe!'+' Estoque atual: '+qtdAnt+' un @ R$'+custoAnt.toFixed(2)+' | Nova entrada: '+qtd+' un @ R$'+custo.toFixed(2)+' | Custo medio resultante: R$'+custoMedio.toFixed(2)+' | Deseja atualizar o estoque com custo medio ponderado?';
+    if(!confirm(msg))return;
+    // atualizar produto existente
+    var custoTotalNovo=custo*qtd;
+    existente.qtd=qtdAnt+qtd;
+    existente.custo=parseFloat(custoMedio.toFixed(4));
+    existente.custo_total=(existente.custo*existente.qtd);
+    if(preco>existente.preco)existente.preco=preco;
+    if(fornId)existente.fornecedor_id=fornId;
+    if(min>existente.minimo)existente.minimo=min;
+    dbSave('produtos',existente);
+    if(_prodPago&&custoTotalNovo>0){
+      var forn=fornecedores.find(f=>String(f.id)===String(fornId));
+      var nd={id:uid(),empresa_id:empresa.id,
+        descricao:'Reposição: '+nome+(forn?' — '+forn.nome:''),
+        valor:custoTotalNovo,categoria:'Fornecedor/Estoque',
+        fornecedor_id:fornId||null,pago:true,
+        criado_por:me?me.id:null,criado_em:Date.now()};
+      despesas.unshift(nd);dbSave('despesas',nd);
+      toast('Estoque atualizado! Custo médio: R$'+custoMedio.toFixed(2)+' 📦','ok');
+    }else{
+      toast('Estoque atualizado com custo médio! 📦','ok');
+    }
   }else{
-    toast('Produto adicionado! 📦','ok');
+    var custoTotal=custo*qtd;
+    var np={id:uid(),empresa_id:empresa.id,nome,preco,custo,qtd,minimo:min,
+      fornecedor_id:fornId||null,pago:_prodPago,custo_total:custoTotal,
+      data_vencimento:_prodPago?null:venc};
+    produtos.push(np);dbSave('produtos',np);
+    if(_prodPago&&custoTotal>0){
+      var forn=fornecedores.find(f=>String(f.id)===String(fornId));
+      var nd={id:uid(),empresa_id:empresa.id,
+        descricao:'Compra: '+nome+(forn?' — '+forn.nome:''),
+        valor:custoTotal,categoria:'Fornecedor/Estoque',
+        fornecedor_id:fornId||null,pago:true,
+        criado_por:me?me.id:null,criado_em:Date.now()};
+      despesas.unshift(nd);dbSave('despesas',nd);
+      toast('Produto adicionado! Despesa gerada no caixa 📦','ok');
+    }else{
+      toast('Produto adicionado! 📦','ok');
+    }
   }
   // reset form
   ['p-nome','p-qtd','p-preco','p-custo','p-cc','p-venc','p-lt','p-lq'].forEach(function(id){var el=document.getElementById(id);if(el)el.value=''});
@@ -2708,6 +2782,92 @@ function eTab(t,el){
   else if(t==='forn')renderFornecedores();
   else if(t==='add')populateFornSelects();
   else renderEstoque();
+}
+
+// ══════════════════════════════════════
+// FECHAR CAIXA
+// ══════════════════════════════════════
+function abrirFecharCaixa(){
+  if(!can('verCaixa')){toast('Sem permissão','err');return}
+  var now=new Date();
+  var mesAtual=now.getFullYear()+'-'+(now.getMonth()+1).toString().padStart(2,'0');
+  var anoInicio=new Date(now.getFullYear(),now.getMonth(),1);
+  // calcular dados do mes
+  var histMes=historico.filter(p=>{
+    var ts=p.finalizado_em||p.criado_em;
+    var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||ts);
+    return d>=anoInicio;
+  });
+  var entMes=entradas.filter(e=>{
+    var d=new Date(parseInt(e.criado_em)||e.criado_em);return d>=anoInicio&&!e._motoboy;
+  });
+  var despMes=despesas.filter(d=>{
+    var dt=new Date(parseInt(d.criado_em)||d.criado_em);return dt>=anoInicio&&!d._motoboy;
+  });
+  var fat=histMes.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
+  var ent=entMes.reduce((a,e)=>a+(parseFloat(e.valor)||0),0);
+  var desp=despMes.reduce((a,d)=>a+(parseFloat(d.valor)||0),0);
+  var lucro=fat+ent-desp;
+  window._fcxDados={fat,ent,desp,lucro,mes:mesAtual,histMes,entMes,despMes};
+  var resumoEl=document.getElementById('fcx-resumo');
+  if(resumoEl)resumoEl.innerHTML=`
+    <div style="background:var(--bg3);border-radius:10px;padding:12px;border:1px solid var(--bd2)">
+      <div style="font-size:11px;font-weight:700;color:var(--tx4);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">${now.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}).toUpperCase()}</div>
+      <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--bd)"><span style="color:var(--tx3)">Faturamento vendas</span><span style="color:var(--g);font-weight:600">${fmt(fat)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--bd)"><span style="color:var(--tx3)">+ Entradas extras</span><span style="color:var(--g);font-weight:600">${fmt(ent)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--bd)"><span style="color:var(--tx3)">- Despesas</span><span style="color:var(--r3);font-weight:600">${fmt(desp)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:14px;font-weight:700"><span>Lucro líquido</span><span style="color:${lucro>=0?'var(--g)':'var(--r3)'}">  ${fmt(lucro)}</span></div>
+    </div>`;
+  calcFecharCaixa();
+  openModal('m-fechar-cx');
+}
+
+function calcFecharCaixa(){
+  if(!window._fcxDados)return;
+  var reserva=parseFloat(document.getElementById('fcx-reserva').value)||0;
+  var pessoas=parseInt(document.getElementById('fcx-pessoas').value)||1;
+  var lucro=window._fcxDados.lucro;
+  var distribuir=Math.max(0,lucro-reserva);
+  var porPessoa=distribuir/pessoas;
+  var el=document.getElementById('fcx-calc');
+  if(el)el.innerHTML=`
+    <div style="background:var(--bg3);border-radius:10px;padding:12px;border:1px solid var(--bd2)">
+      <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--bd)"><span style="color:var(--tx3)">Lucro líquido</span><span>${fmt(lucro)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--bd)"><span style="color:var(--tx3)">- Reserva</span><span style="color:var(--a)">${fmt(reserva)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--bd)"><span style="color:var(--tx3)">A distribuir</span><span style="color:var(--g);font-weight:600">${fmt(distribuir)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:15px;font-weight:700"><span>Por pessoa (${pessoas})</span><span style="color:var(--g)">${fmt(porPessoa)}</span></div>
+    </div>`;
+  window._fcxCalc={reserva,pessoas,distribuir,porPessoa};
+}
+
+function confirmarFechamento(){
+  if(!window._fcxDados||!window._fcxCalc)return;
+  var {fat,ent,desp,lucro,mes,histMes,entMes,despMes}=window._fcxDados;
+  var {reserva,pessoas,distribuir,porPessoa}=window._fcxCalc;
+    if(!confirm('Confirmar fechamento de caixa? Esta acao arquiva os dados e registra o historico.'))return;
+  // criar registro de fechamento
+  var fech={
+    id:uid(),empresa_id:empresa.id,mes,
+    faturamento:fat,entradas_extra:ent,despesas:desp,lucro_liquido:lucro,
+    reserva,pessoas,distribuir,por_pessoa:porPessoa,
+    fechado_por:me?me.nome:'',fechado_em:Date.now(),
+    // snapshot completo
+    snapshot_hist:JSON.stringify(histMes.map(p=>({id:p.id,total:p.total_editado||p.total,pgto:p.pgto,finalizado_em:p.finalizado_em}))),
+    snapshot_ent:JSON.stringify(entMes.map(e=>({id:e.id,descricao:e.descricao,valor:e.valor}))),
+    snapshot_desp:JSON.stringify(despMes.map(d=>({id:d.id,descricao:d.descricao,valor:d.valor})))
+  };
+  fechamentos.unshift(fech);
+  // salvar no banco (tabela fechamentos - rodar SQL depois)
+  dbSave('fechamentos',fech).catch?.(()=>{});
+  // salvar local
+  if(empresa){
+    var cache=LS.g('data_'+empresa.id)||{};
+    cache.fechamentos=fechamentos;
+    LS.s('data_'+empresa.id,cache);
+  }
+  closeModal('m-fechar-cx');
+  toast('Caixa fechado! Lucro por pessoa: '+fmt(porPessoa)+' 🔒','ok');
+  renderCaixa();
 }
 
 // ══════════════════════════════════════
@@ -3023,7 +3183,7 @@ function renderCaixa(){
   if(!entFilt.length){if(el)el.innerHTML='';if(ee)ee.style.display='block'}
   else{if(ee)ee.style.display='none';if(el)el.innerHTML=entFilt.map(e=>`
     <div class="card"><div class="card-accent"></div><div class="ch">
-      <div><div class="ct">${e.descricao}</div><div class="cs">${e.categoria} · ${e.forma}</div></div>
+      <div><div class="ct">${e.descricao}</div><div class="cs">${e.categoria} · ${e.forma} · ${new Date(parseInt(e.criado_em)||Date.now()).toLocaleDateString('pt-BR')}</div></div>
       <div style="display:flex;align-items:center;gap:7px">
         <div style="font-size:16px;font-weight:700;color:var(--g);font-family:var(--mo)">${fmt(e.valor)}</div>
         <button class="btn btn-d btn-sm" style="padding:5px 9px" onclick="excluirEntrada('${e.id}')">🗑️</button>
@@ -3035,7 +3195,7 @@ function renderCaixa(){
   if(!despFilt.length){if(dl)dl.innerHTML='';if(de2)de2.style.display='block'}
   else{if(de2)de2.style.display='none';if(dl)dl.innerHTML=despFilt.map(d=>`
     <div class="card"><div class="card-accent"></div><div class="ch">
-      <div><div class="ct">${d.descricao}</div><div class="cs">${d.categoria}</div></div>
+      <div><div class="ct">${d.descricao}</div><div class="cs">${d.categoria} · ${new Date(parseInt(d.criado_em)||Date.now()).toLocaleDateString('pt-BR')}</div></div>
       <div style="display:flex;align-items:center;gap:7px">
         <div style="font-size:16px;font-weight:700;color:#FCA5A5;font-family:var(--mo)">${fmt(d.valor)}</div>
         <button class="btn btn-d btn-sm" style="padding:5px 9px" onclick="excluirDespesa('${d.id}')">🗑️</button>
@@ -3165,7 +3325,7 @@ function gerarRel(){
   var dadosPend=historico.filter(p=>p.pendente==true||p.pendente==='true');
   var total=dadosPagos.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
   var totalPend=dadosPend.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
-  var despPeriod=despesas.filter(d=>periodFilter(d.criado_em,relPeriod,de,ate));
+  var despPeriod=despesas.filter(d=>periodFilter(d.criado_em,relPeriod,de,ate)&&!d._motoboy);
   var entPeriod=entradas.filter(e=>periodFilter(e.criado_em,relPeriod,de,ate));
   var totalDesp=despPeriod.reduce((a,d)=>a+(parseFloat(d.valor)||0),0);
   var totalEnt=entPeriod.reduce((a,e)=>a+(parseFloat(e.valor)||0),0);
@@ -3225,9 +3385,52 @@ function gerarRel(){
 }
 
 // ══════════════════════════════════════
+// MOTOBOY
+// ══════════════════════════════════════
+var _motoboyPedId=null;
+var _motoboyCallback=null;
+
+function verificarMotoboy(pedId, callback){
+  var p=pedidos.find(x=>String(x.id)===String(pedId));
+  if(!p||p.tipo!=='Home'){callback();return;}
+  _motoboyPedId=pedId;
+  _motoboyCallback=callback;
+  document.getElementById('moto-val').value='';
+  openModal('m-motoboy');
+}
+
+function confirmarMotoboy(semTaxa){
+  var val=semTaxa?0:parseFloat(document.getElementById('moto-val').value)||0;
+  _motoboy=val;
+  closeModal('m-motoboy');
+  var p=pedidos.find(x=>String(x.id)===String(_motoboyPedId));
+  if(p&&val>0){
+    // salvar taxa no pedido
+    p.motoboy=val;
+    dbSave('pedidos',{...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(p.itens)});
+    // gerar despesa automatica (saida entregador)
+    var nd={id:uid(),empresa_id:empresa.id,
+      descricao:'Motoboy — #'+String(p.id).slice(-6),
+      valor:val,categoria:'Motoboy',
+      pago:true,criado_por:me?me.id:null,criado_em:Date.now(),_motoboy:true};
+    despesas.unshift(nd);dbSave('despesas',nd);
+    // gerar entrada automatica (cobrado do cliente)
+    var ne={id:uid(),empresa_id:empresa.id,
+      descricao:'Taxa entrega — #'+String(p.id).slice(-6),
+      valor:val,forma:'Motoboy',categoria:'Taxa Entrega',
+      pago:true,criado_por:me?me.id:null,criado_em:Date.now(),_motoboy:true};
+    entradas.unshift(ne);dbSave('entradas',ne);
+    toast('Taxa R$'+val.toFixed(2)+' registrada — despesa e entrada geradas','ok');
+  }
+  if(_motoboyCallback)_motoboyCallback();
+  _motoboyPedId=null;_motoboyCallback=null;
+}
+
+// ══════════════════════════════════════
 // CLIENTES
 // ══════════════════════════════════════
 var clPeriod='mes';
+var _motoboy=0; // valor taxa motoboy atual
 
 function setClPeriod(p,el){
   clPeriod=p;
@@ -3717,7 +3920,7 @@ function exportarRelPDF(){
   var dadosPend=historico.filter(p=>p.pendente==true||p.pendente==='true');
   var total=dadosPagos.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
   var totalPend=dadosPend.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
-  var despPeriod=despesas.filter(d=>periodFilter(d.criado_em,relPeriod,de,ate));
+  var despPeriod=despesas.filter(d=>periodFilter(d.criado_em,relPeriod,de,ate)&&!d._motoboy);
   var entPeriod=entradas.filter(e=>periodFilter(e.criado_em,relPeriod,de,ate));
   var totalDesp=despPeriod.reduce((a,d)=>a+(parseFloat(d.valor)||0),0);
   var totalEnt=entPeriod.reduce((a,e)=>a+(parseFloat(e.valor)||0),0);
