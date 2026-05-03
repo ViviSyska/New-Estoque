@@ -466,6 +466,7 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
         <button class="tbb" onclick="cxTab('desp',this)">Despesas</button>
         <button class="tbb" onclick="cxTab('hist',this)">Histórico</button>
         <button class="tbb" onclick="cxTab('rel',this)">Relatório</button>
+        <button class="tbb" onclick="cxTab('fech',this)">Fechamentos</button>
       </div>
       <div id="cx-res">
         <button class="btn btn-p btn-bl" style="margin-bottom:12px" onclick="abrirFecharCaixa()">🔒 Fechar Caixa do Mês</button>
@@ -579,6 +580,14 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
           <div class="ct" style="margin-bottom:10px">Resultado</div>
           <div id="rel-body"></div>
           <button class="btn btn-g btn-bl" style="margin-top:12px" onclick="exportarRelPDF()">📄 Exportar PDF</button>
+        </div>
+      </div>
+      <div id="cx-fech-tab" style="display:none">
+        <div id="fech-list"></div>
+        <div id="fech-empty" class="empty" style="display:none">
+          <div class="ei">📅</div>
+          <div class="et">Sem fechamentos</div>
+          <div class="es">Feche o caixa mensal para ver o histórico aqui</div>
         </div>
       </div>
     </div>
@@ -955,6 +964,7 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
   <div class="msh"><div class="mhan"></div>
     <div class="mhdr"><div class="mtit">🔒 Fechar Caixa</div><button class="btn btn-g btn-sm" onclick="closeModal('m-fechar-cx')">Fechar</button></div>
     <div class="mbdy">
+      <div class="fg"><label>Mês de referência</label><input type="month" id="fcx-mes" oninput="calcularMesFechamento()"></div>
       <div id="fcx-resumo" style="margin-bottom:16px"></div>
       <div class="fg"><label>Fundo de reserva (manter no caixa)</label><input type="number" id="fcx-reserva" placeholder="Ex: 500,00" step="0.01" min="0" oninput="calcFecharCaixa()"></div>
       <div class="fg"><label>Dividir entre quantas pessoas</label><input type="number" id="fcx-pessoas" value="1" min="1" step="1" oninput="calcFecharCaixa()"></div>
@@ -2787,27 +2797,62 @@ function eTab(t,el){
 // ══════════════════════════════════════
 // FECHAR CAIXA
 // ══════════════════════════════════════
-function abrirFecharCaixa(){
-  if(!can('verCaixa')){toast('Sem permissão','err');return}
-  var now=new Date();
-  var mesAtual=now.getFullYear()+'-'+(now.getMonth()+1).toString().padStart(2,'0');
-  var anoInicio=new Date(now.getFullYear(),now.getMonth(),1);
-  // calcular dados do mes
+function calcularMesFechamento(){
+  var mesInput=document.getElementById('fcx-mes').value;
+  if(!mesInput)return;
+  var partes=mesInput.split('-');
+  var ano=parseInt(partes[0]);var mes=parseInt(partes[1])-1;
+  var inicio=new Date(ano,mes,1);
+  var fim=new Date(ano,mes+1,0,23,59,59,999);
   var histMes=historico.filter(p=>{
     var ts=p.finalizado_em||p.criado_em;
     var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||ts);
-    return d>=anoInicio;
+    return d>=inicio&&d<=fim;
   });
   var entMes=entradas.filter(e=>{
-    var d=new Date(parseInt(e.criado_em)||e.criado_em);return d>=anoInicio&&!e._motoboy;
+    var d=new Date(parseInt(e.criado_em)||e.criado_em);return d>=inicio&&d<=fim&&!e._motoboy;
   });
   var despMes=despesas.filter(d=>{
-    var dt=new Date(parseInt(d.criado_em)||d.criado_em);return dt>=anoInicio&&!d._motoboy;
+    var dt=new Date(parseInt(d.criado_em)||d.criado_em);return dt>=inicio&&dt<=fim&&!d._motoboy;
   });
   var fat=histMes.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
   var ent=entMes.reduce((a,e)=>a+(parseFloat(e.valor)||0),0);
   var desp=despMes.reduce((a,d)=>a+(parseFloat(d.valor)||0),0);
   var lucro=fat+ent-desp;
+  window._fcxDados={fat,ent,desp,lucro,mes:mesInput,histMes,entMes,despMes};
+  var nomeMes=new Date(ano,mes,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'}).toUpperCase();
+  var resumoEl=document.getElementById('fcx-resumo');
+  if(resumoEl)resumoEl.innerHTML=`
+    <div style="background:var(--bg3);border-radius:10px;padding:12px;border:1px solid var(--bd2)">
+      <div style="font-size:11px;font-weight:700;color:var(--tx4);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">${nomeMes}</div>
+      <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--bd)"><span style="color:var(--tx3)">Faturamento vendas</span><span style="color:var(--g);font-weight:600">${fmt(fat)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--bd)"><span style="color:var(--tx3)">+ Entradas extras</span><span style="color:var(--g);font-weight:600">${fmt(ent)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--bd)"><span style="color:var(--tx3)">- Despesas</span><span style="color:var(--r3);font-weight:600">${fmt(desp)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:14px;font-weight:700"><span>Lucro liquido</span><span style="color:${lucro>=0?'var(--g)':'var(--r3)'}"> ${fmt(lucro)}</span></div>
+    </div>`;
+  calcFecharCaixa();
+}
+
+function abrirFecharCaixa(){
+  if(!can('verCaixa')){toast('Sem permissão','err');return}
+  var now=new Date();
+  var mesAtual=now.getFullYear()+'-'+(now.getMonth()+1).toString().padStart(2,'0');
+  var mesEl=document.getElementById('fcx-mes');
+  if(mesEl)mesEl.value=mesAtual;
+  var resumoEl=document.getElementById('fcx-resumo');
+  if(resumoEl)resumoEl.innerHTML='';
+  var calcEl=document.getElementById('fcx-calc');
+  if(calcEl)calcEl.innerHTML='';
+  document.getElementById('fcx-reserva').value='';
+  document.getElementById('fcx-pessoas').value='1';
+  window._fcxDados=null;
+  openModal('m-fechar-cx');
+  calcularMesFechamento();
+  // dummy para manter compatibilidade
+  var now2=new Date();
+  var anoInicio=new Date(now2.getFullYear(),now2.getMonth(),1);
+  var histMes=[];var entMes=[];var despMes=[];
+  var fat=0;var ent=0;var desp=0;var lucro=0;
   window._fcxDados={fat,ent,desp,lucro,mes:mesAtual,histMes,entMes,despMes};
   var resumoEl=document.getElementById('fcx-resumo');
   if(resumoEl)resumoEl.innerHTML=`
@@ -2868,6 +2913,118 @@ function confirmarFechamento(){
   closeModal('m-fechar-cx');
   toast('Caixa fechado! Lucro por pessoa: '+fmt(porPessoa)+' 🔒','ok');
   renderCaixa();
+}
+
+// ══════════════════════════════════════
+// RENDER FECHAMENTOS
+// ══════════════════════════════════════
+function renderFechamentos(){
+  var list=document.getElementById('fech-list');
+  var empty=document.getElementById('fech-empty');
+  if(!list)return;
+  if(!fechamentos||!fechamentos.length){
+    list.innerHTML='';
+    if(empty)empty.style.display='block';
+    return;
+  }
+  if(empty)empty.style.display='none';
+  list.innerHTML=fechamentos.map(f=>{
+    var data=new Date(parseInt(f.fechado_em)||Date.now()).toLocaleDateString('pt-BR');
+    var partes=f.mes?f.mes.split('-'):[];
+    var nomeMes=partes.length===2?new Date(parseInt(partes[0]),parseInt(partes[1])-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'}):'—';
+    return`<div class="card">
+      <div class="card-accent"></div>
+      <div class="ch">
+        <div>
+          <div class="ct" style="text-transform:capitalize">${nomeMes}</div>
+          <div class="cs">Fechado em ${data} por ${f.fechado_por||'—'}</div>
+          <div class="cs">${f.pessoas||1} pessoa(s) · R$ ${parseFloat(f.por_pessoa||0).toFixed(2).replace('.',',')} cada</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:16px;font-weight:700;color:var(--g);font-family:var(--mo)">${fmt(f.lucro_liquido||0)}</div>
+          <div style="font-size:9px;color:var(--tx4)">lucro líquido</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;font-size:10px;color:var(--tx3);flex:1">
+          <span style="color:var(--g)">Fat: ${fmt(f.faturamento||0)}</span>
+          <span>·</span>
+          <span style="color:var(--r3)">Desp: ${fmt(f.despesas||0)}</span>
+          <span>·</span>
+          <span style="color:var(--a)">Reserva: ${fmt(f.reserva||0)}</span>
+        </div>
+        <button class="btn btn-g btn-sm" onclick="pdfFechamento('${f.id}')">📄 PDF</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function pdfFechamento(id){
+  var f=fechamentos.find(x=>String(x.id)===String(id));
+  if(!f)return;
+  var emp=empresa||{};
+  var partes=f.mes?f.mes.split('-'):[];
+  var nomeMes=partes.length===2?new Date(parseInt(partes[0]),parseInt(partes[1])-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'}):'—';
+  var snapHist=[];var snapEnt=[];var snapDesp=[];
+  try{snapHist=JSON.parse(f.snapshot_hist||'[]')}catch(e){}
+  try{snapEnt=JSON.parse(f.snapshot_ent||'[]')}catch(e){}
+  try{snapDesp=JSON.parse(f.snapshot_desp||'[]')}catch(e){}
+  var html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:sans-serif;font-size:12px;color:#000;padding:24px;max-width:700px;margin:0 auto}
+    .header{border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start}
+    .emp-name{font-size:18px;font-weight:700}
+    .emp-info{font-size:10px;color:#555;margin-top:3px}
+    h2{font-size:14px;font-weight:700;margin:16px 0 8px;border-bottom:1px solid #ddd;padding-bottom:4px}
+    .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f5f5f5;font-size:12px}
+    .total-box{display:flex;justify-content:space-between;padding:10px 12px;background:#f5f5f5;border-radius:6px;font-size:15px;font-weight:700;margin-top:8px}
+    .dist-box{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#7F1D1D;color:#fff;border-radius:6px;margin-top:8px;font-size:13px;font-weight:700}
+    table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px}
+    th{padding:6px 8px;text-align:left;font-weight:700;font-size:10px;background:#f5f5f5;text-transform:uppercase}
+    td{padding:5px 8px;border-bottom:1px solid #f0f0f0}
+    .footer{text-align:center;margin-top:24px;font-size:10px;color:#888;border-top:1px solid #ddd;padding-top:10px}
+    @media print{body{padding:10px}}
+  </style></head><body>
+    <div class="header">
+      <div>
+        <div class="emp-name">${emp.razao_social||emp.nome||'NS Estoque Pro'}</div>
+        <div class="emp-info">${[emp.cpf_cnpj,emp.telefone].filter(Boolean).join(' · ')}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:700;font-size:14px">FECHAMENTO DE CAIXA</div>
+        <div style="font-size:11px;color:#555;text-transform:capitalize">${nomeMes}</div>
+        <div style="font-size:10px;color:#555">Gerado em: ${new Date().toLocaleDateString('pt-BR')}</div>
+      </div>
+    </div>
+
+    <h2>Resumo Financeiro</h2>
+    <div class="row"><span>Faturamento total (vendas)</span><span style="color:#16a34a;font-weight:600">R$ ${parseFloat(f.faturamento||0).toFixed(2).replace('.',',')}</span></div>
+    <div class="row"><span>+ Entradas extras</span><span style="color:#16a34a;font-weight:600">R$ ${parseFloat(f.entradas_extra||0).toFixed(2).replace('.',',')}</span></div>
+    <div class="row"><span>- Despesas operacionais</span><span style="color:#dc2626;font-weight:600">R$ ${parseFloat(f.despesas||0).toFixed(2).replace('.',',')}</span></div>
+    <div class="total-box"><span>Lucro Líquido</span><span style="color:${parseFloat(f.lucro_liquido||0)>=0?'#16a34a':'#dc2626'}">R$ ${parseFloat(f.lucro_liquido||0).toFixed(2).replace('.',',')}</span></div>
+
+    <h2>Distribuição</h2>
+    <div class="row"><span>Fundo de reserva</span><span style="color:#b45309;font-weight:600">R$ ${parseFloat(f.reserva||0).toFixed(2).replace('.',',')}</span></div>
+    <div class="row"><span>Valor a distribuir</span><span style="font-weight:600">R$ ${parseFloat(f.distribuir||0).toFixed(2).replace('.',',')}</span></div>
+    <div class="row"><span>Dividido entre</span><span>${f.pessoas||1} pessoa(s)</span></div>
+    <div class="dist-box"><span>Valor por pessoa</span><span>R$ ${parseFloat(f.por_pessoa||0).toFixed(2).replace('.',',')}</span></div>
+
+    ${snapHist.length?`<h2>Vendas do Mês (${snapHist.length})</h2>
+    <table><thead><tr><th>#</th><th>Pagamento</th><th style="text-align:right">Total</th></tr></thead>
+    <tbody>${snapHist.map(p=>`<tr><td>#${String(p.id).slice(-6)}</td><td>${p.pgto||'—'}</td><td style="text-align:right">R$ ${parseFloat(p.total||0).toFixed(2).replace('.',',')}</td></tr>`).join('')}</tbody>
+    </table>`:''}
+
+    ${snapDesp.length?`<h2>Despesas do Mês (${snapDesp.length})</h2>
+    <table><thead><tr><th>Descrição</th><th style="text-align:right">Valor</th></tr></thead>
+    <tbody>${snapDesp.map(d=>`<tr><td>${d.descricao}</td><td style="text-align:right">R$ ${parseFloat(d.valor||0).toFixed(2).replace('.',',')}</td></tr>`).join('')}</tbody>
+    </table>`:''}
+
+    <div class="footer">
+      Fechado por: ${f.fechado_por||'—'} &nbsp;|&nbsp;
+      ${emp.rodape||emp.nome||'NS Estoque Pro'}
+    </div>
+  </body></html>`;
+  abrirJanelaPDF(html);
 }
 
 // ══════════════════════════════════════
@@ -3087,7 +3244,7 @@ function gerarReciboPDF(){
     '<div style="margin-bottom:14px"><strong>'+f.nome+'</strong>'+(f.cpf_cnpj?' · CNPJ/CPF: '+f.cpf_cnpj:'')+(f.whatsapp?'<br>'+f.whatsapp:'')+'</div>'+
     '<table>'+
       '<thead><tr><th>Descrição</th><th>Data</th><th style="text-align:right">Valor</th></tr></thead>'+
-      '<tbody>'+pagamentos.map(function(d){return '<tr><td>'+d.descricao+'</td><td>'+new Date(parseInt(d.criado_em)||Date.now()).toLocaleDateString('pt-BR')+'</td><td style="text-align:right">R$ '+parseFloat(d.valor||0).toFixed(2).replace('.',',')+'</td></tr>'}).join('')+'</tbody>'+
+      '<tbody>'+pagamentos.map(function(d){return '<tr><td>'+d.descricao+'</td><td>'+(function(){var ts=d.criado_em;var dt=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||Date.now());return dt.toLocaleDateString('pt-BR')})()+'</td><td style="text-align:right">R$ '+parseFloat(d.valor||0).toFixed(2).replace('.',',')+'</td></tr>'}).join('')+'</tbody>'+
     '</table>'+
     '<div class="total"><span>TOTAL PAGO</span><span>R$ '+total.toFixed(2).replace('.',',')+'</span></div>'+
     (emp.rodape?'<div style="text-align:center;margin-top:20px;font-size:11px;color:#888">'+emp.rodape+'</div>':'')+
@@ -3183,7 +3340,7 @@ function renderCaixa(){
   if(!entFilt.length){if(el)el.innerHTML='';if(ee)ee.style.display='block'}
   else{if(ee)ee.style.display='none';if(el)el.innerHTML=entFilt.map(e=>`
     <div class="card"><div class="card-accent"></div><div class="ch">
-      <div><div class="ct">${e.descricao}</div><div class="cs">${e.categoria} · ${e.forma} · ${new Date(parseInt(e.criado_em)||Date.now()).toLocaleDateString('pt-BR')}</div></div>
+      <div><div class="ct">${e.descricao}</div><div class="cs">${e.categoria} · ${e.forma} · ${(function(){var ts=e.criado_em;var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||Date.now());return d.toLocaleDateString('pt-BR')})()}</div></div>
       <div style="display:flex;align-items:center;gap:7px">
         <div style="font-size:16px;font-weight:700;color:var(--g);font-family:var(--mo)">${fmt(e.valor)}</div>
         <button class="btn btn-d btn-sm" style="padding:5px 9px" onclick="excluirEntrada('${e.id}')">🗑️</button>
@@ -3195,7 +3352,7 @@ function renderCaixa(){
   if(!despFilt.length){if(dl)dl.innerHTML='';if(de2)de2.style.display='block'}
   else{if(de2)de2.style.display='none';if(dl)dl.innerHTML=despFilt.map(d=>`
     <div class="card"><div class="card-accent"></div><div class="ch">
-      <div><div class="ct">${d.descricao}</div><div class="cs">${d.categoria} · ${new Date(parseInt(d.criado_em)||Date.now()).toLocaleDateString('pt-BR')}</div></div>
+      <div><div class="ct">${d.descricao}</div><div class="cs">${d.categoria} · ${(function(){var ts=d.criado_em;var dt=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||Date.now());return dt.toLocaleDateString('pt-BR')})()}</div></div>
       <div style="display:flex;align-items:center;gap:7px">
         <div style="font-size:16px;font-weight:700;color:#FCA5A5;font-family:var(--mo)">${fmt(d.valor)}</div>
         <button class="btn btn-d btn-sm" style="padding:5px 9px" onclick="excluirDespesa('${d.id}')">🗑️</button>
@@ -3212,12 +3369,13 @@ function renderCaixa(){
 }
 
 function cxTab(t,el){
-  var tabs={res:'cx-res',ent:'cx-ent-tab',desp:'cx-desp-tab',hist:'cx-hist-tab',rel:'cx-rel-tab'};
+  var tabs={res:'cx-res',ent:'cx-ent-tab',desp:'cx-desp-tab',hist:'cx-hist-tab',rel:'cx-rel-tab',fech:'cx-fech-tab'};
   Object.values(tabs).forEach(id=>{var e=document.getElementById(id);if(e)e.style.display='none'});
   var show=document.getElementById(tabs[t]);if(show)show.style.display='block';
   document.querySelectorAll('#sc-caixa .tbb').forEach(b=>b.classList.remove('active'));
   if(el)el.classList.add('active');
   if(t==='hist')renderHistorico();
+  if(t==='fech')renderFechamentos();
 }
 
 function salvarEntrada(){
