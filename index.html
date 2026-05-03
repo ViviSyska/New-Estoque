@@ -364,10 +364,22 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
     <!-- PAINEL -->
     <div id="sc-dash" class="sc active">
       <div class="metrics">
-        <div class="met"><div class="met-ac" style="background:var(--r3)"></div><div class="ml">Faturamento ano</div><div class="mv" style="color:var(--r3)" id="d-fat">0,00</div><div class="ms">R$</div></div>
+        <div class="met"><div class="met-ac" style="background:var(--g)"></div>
+          <div class="ml">Faturamento ano</div>
+          <div class="mv" style="color:var(--g)" id="d-fat">0,00</div>
+          <div class="ms">R$ — só comandas pagas</div>
+          <div style="margin-top:7px;height:3px;background:var(--bg2);border-radius:3px;overflow:hidden"><div id="d-fat-bar" style="height:100%;width:0%;background:var(--g);border-radius:3px;transition:width .4s"></div></div>
+          <div id="d-fat-pct" class="ms" style="margin-top:3px">—</div>
+        </div>
         <div class="met"><div class="met-ac" style="background:var(--a)"></div><div class="ml">Abertos agora</div><div class="mv" id="d-open">0</div><div class="ms">comandas</div></div>
-        <div class="met"><div class="met-ac" style="background:var(--g)"></div><div class="ml">Concluídos ano</div><div class="mv" style="color:var(--g)" id="d-done">0</div><div class="ms">pedidos</div></div>
-        <div class="met"><div class="met-ac" style="background:var(--b)"></div><div class="ml">Ticket médio</div><div class="mv" id="d-tick">0,00</div><div class="ms">R$</div></div>
+        <div class="met"><div class="met-ac" style="background:var(--g)"></div><div class="ml">Concluídos ano</div><div class="mv" style="color:var(--g)" id="d-done">0</div><div class="ms">pedidos pagos</div></div>
+        <div class="met"><div class="met-ac" style="background:var(--b)"></div><div class="ml">Ticket médio</div><div class="mv" id="d-tick">0,00</div><div class="ms">R$ por comanda paga</div></div>
+        <div class="met"><div class="met-ac" style="background:var(--a)"></div><div class="ml" style="color:var(--a)">Pendentes</div><div class="mv" style="color:var(--a)" id="d-pend">0,00</div><div class="ms">R$ — a receber</div><div id="d-pend-pct" class="ms" style="margin-top:2px">—</div></div>
+        <div class="met"><div class="met-ac" style="background:var(--r3)"></div><div class="ml" style="color:var(--r3)">Despesas</div><div class="mv" style="color:var(--r3)" id="d-desp">0,00</div><div class="ms">R$ — ano atual</div></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;background:var(--card2);border:1px solid var(--bd2);border-radius:11px;padding:11px 14px;margin-bottom:10px">
+        <div><div style="font-size:11px;font-weight:600;color:var(--tx2)">Saldo líquido ano</div><div style="font-size:9px;color:var(--tx4)">faturamento − despesas</div></div>
+        <div style="font-size:18px;font-weight:700;font-family:var(--mo)" id="d-saldo">R$ 0,00</div>
       </div>
       <div class="card"><div class="card-accent"></div><div class="ch"><span class="ct">🏆 Mais vendidos</span><span class="b br">ano todo</span></div><div id="d-top"></div></div>
       <div class="card"><div class="card-accent"></div><div class="ch"><span class="ct">💰 Caixa — ano</span></div><div id="d-caixa"></div></div>
@@ -1686,23 +1698,49 @@ function renderHistorico(){
 
 function renderDash(){
   if(!can('dash'))return;
-  // sempre mostrar ano todo, sem filtro
   var now=new Date();
   var anoInicio=new Date(now.getFullYear(),0,1);
-  var filtered=historico.filter(p=>{
+  var anoFim=new Date(now.getFullYear(),11,31,23,59,59);
+  // filtrar historico do ano
+  var filtAno=historico.filter(p=>{
     var ts=p.finalizado_em||p.criado_em;
-    if(!ts)return true;
-    var d;
-    if(typeof ts==='string'&&ts.includes('T')){d=new Date(ts)}
-    else{var n=parseInt(ts);d=n>0?new Date(n):new Date(ts)}
-    return d>=anoInicio;
+    if(!ts)return false;
+    var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||ts);
+    return d>=anoInicio&&d<=anoFim;
   });
-  var fat=filtered.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
-  var tick=filtered.length?fat/filtered.length:0;
+  // so pagas (nao pendentes)
+  var filtPagas=filtAno.filter(p=>!isTrue(p.pendente)&&isTrue(p.pago));
+  // pendentes do ano
+  var filtPend=filtAno.filter(p=>isTrue(p.pendente)||!isTrue(p.pago));
+  // despesas do ano (sem motoboy)
+  var filtDesp=despesas.filter(d=>{
+    var dt=typeof d.criado_em==='string'&&d.criado_em.includes('T')?new Date(d.criado_em):new Date(parseInt(d.criado_em)||d.criado_em);
+    return dt>=anoInicio&&dt<=anoFim&&!d._motoboy;
+  });
+  var fat=filtPagas.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
+  var pend=filtPend.reduce((a,p)=>a+(parseFloat(p.valor_faltando||p.total_editado||p.total)||0),0);
+  var desp=filtDesp.reduce((a,d)=>a+(parseFloat(d.valor)||0),0);
+  var saldo=fat-desp;
+  var tick=filtPagas.length?fat/filtPagas.length:0;
+  var totalGeral=fat+pend;
+  var pctPago=totalGeral>0?Math.round(fat/totalGeral*100):100;
+  var pctPend=totalGeral>0?Math.round(pend/totalGeral*100):0;
   document.getElementById('d-fat').textContent=fmtN(fat);
   document.getElementById('d-open').textContent=pedidos.length;
-  document.getElementById('d-done').textContent=filtered.length;
+  document.getElementById('d-done').textContent=filtPagas.length;
   document.getElementById('d-tick').textContent=fmtN(tick);
+  document.getElementById('d-pend').textContent=fmtN(pend);
+  document.getElementById('d-desp').textContent=fmtN(desp);
+  var saldoEl=document.getElementById('d-saldo');
+  if(saldoEl){saldoEl.textContent=fmt(saldo);saldoEl.style.color=saldo>=0?'var(--g)':'var(--r3)';}
+  // barra progresso faturamento
+  var bar=document.getElementById('d-fat-bar');
+  var pct=document.getElementById('d-fat-pct');
+  if(bar)bar.style.width=pctPago+'%';
+  if(pct)pct.textContent=pctPago+'% pago · '+pctPend+'% pendente';
+  // % pendentes do faturamento
+  var pendPct=document.getElementById('d-pend-pct');
+  if(pendPct)pendPct.textContent=totalGeral>0?fmtN(pctPend)+'% do faturamento':'';
   var byPgto={Pix:0,Dinheiro:0,'Crédito':0,'Débito':0};
   filtered.forEach(p=>{if(byPgto[p.pgto]!==undefined)byPgto[p.pgto]+=parseFloat(p.total_editado||p.total)||0});
   document.getElementById('d-caixa').innerHTML=Object.entries(byPgto).map(([k,v])=>`<div class="tr"><span class="tr-l">${k}</span><span class="tr-v">${fmt(v)}</span></div>`).join('')+
