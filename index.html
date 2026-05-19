@@ -1918,7 +1918,9 @@ function addItemPed(){
   var prod=produtos.find(p=>String(p.id)===String(pid));if(!prod)return;
   // usar preço customizado ou preço do produto (cupom aplicado por comanda, não por item)
   var pf=precoCustom>0?precoCustom:parseFloat(prod.preco);
-  _pedItems.push({prodId:prod.id,nome:prod.nome,qtd,precoUnit:prod.preco,precoFinal:pf,total:pf*qtd});
+  var existing=_pedItems.find(it=>String(it.prodId)===String(prod.id)&&it.precoFinal===pf);
+  if(existing){existing.qtd+=qtd;existing.total=existing.precoFinal*existing.qtd;}
+  else{_pedItems.push({prodId:prod.id,nome:prod.nome,qtd,precoUnit:prod.preco,precoFinal:pf,total:pf*qtd});}
   document.getElementById('ped-preco-unit').value='';
   document.getElementById('ped-qtd').value=1;
   // avisar se estoque baixo
@@ -2125,7 +2127,7 @@ function toggleEnt(id){
     salvarPedidoCache(p);
     dbSave('pedidos',{...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(p.itens)});
     toast('✅ Entregue! Finalizando...','ok');
-    setTimeout(()=>moverHistorico(p),600);
+    moverHistorico(p);
   }else if(parseFloat(p.valor_faltando)>0){
     // parcial + entregue → cobra o restante agora
     salvarPedidoCache(p);
