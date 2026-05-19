@@ -765,6 +765,9 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
       <div class="fg"><label>Fornecedor (opcional)</label><select id="ep-forn"><option value="">Sem fornecedor</option></select></div>
       <button class="btn btn-p btn-bl" style="margin-top:10px" onclick="salvarEditProd()">Salvar alterações</button>
       <button class="btn btn-d btn-bl" style="margin-top:8px" onclick="excluirProd()">Excluir produto</button>
+      <div class="div" style="margin:16px 0 10px"></div>
+      <div style="font-size:13px;font-weight:700;color:var(--tx2);margin-bottom:10px">Histórico de entradas de custo</div>
+      <div id="ep-entradas-list"></div>
     </div>
   </div>
 </div>
@@ -1995,8 +1998,10 @@ function salvarPedido(){
 }
 
 // registra movimentacao no log + banco
-function logMov(tipo, prod, qtd, motivo, pedidoId){
+function logMov(tipo, prod, qtd, motivo, pedidoId, custo){
   if(!empresa||!prod||!qtd)return;
+  var qtdAbs=Math.abs(parseInt(qtd)||0);
+  var custoUnit=custo!=null?parseFloat(custo)||0:null;
   var mv={
     id: uid(),
     empresa_id: empresa.id,
@@ -2004,7 +2009,9 @@ function logMov(tipo, prod, qtd, motivo, pedidoId){
     produto_id: String(prod.id),
     produto_nome: prod.nome||'',
     tipo: tipo, // 'saida' | 'devolucao' | 'ajuste' | 'entrada'
-    qtd: Math.abs(parseInt(qtd)||0),
+    qtd: qtdAbs,
+    custo: custoUnit,
+    custo_total: custoUnit!=null?custoUnit*qtdAbs:null,
     motivo: motivo||'',
     vendedor_id: me?me.id:null,
     vendedor_nome: me?me.nome:null,
@@ -2732,6 +2739,7 @@ function editProduto(id){
   var sel=document.getElementById('ep-forn');
   if(sel)sel.value=p.fornecedor_id||'';
   openModal('m-edit-prod');
+  renderEntradaProduto(id);
 }
 
 function salvarEditProd(){
@@ -2745,6 +2753,82 @@ function salvarEditProd(){
   p.fornecedor_id=fSel?(fSel.value||null):p.fornecedor_id;
   dbSave('produtos',p);
   toast('Produto atualizado! 📦','ok');closeModal('m-edit-prod');renderEstoque();
+}
+
+function renderEntradaProduto(prodId){
+  var box=document.getElementById('ep-entradas-list');if(!box)return;
+  var lista=(movEstoque||[]).filter(function(m){return String(m.produto_id)===String(prodId)&&m.tipo==='entrada';});
+  lista.sort(function(a,b){return (parseInt(b.criado_em)||0)-(parseInt(a.criado_em)||0);});
+  if(!lista.length){box.innerHTML='<div style="color:var(--tx4);font-size:12px;text-align:center;padding:8px 0">Nenhuma entrada registrada ainda</div>';return;}
+  box.innerHTML=lista.map(function(m){
+    var d=new Date(parseInt(m.criado_em)||0);
+    var ds=d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    var custoStr=m.custo!=null?fmt(m.custo):'—';
+    var totalStr=m.custo_total!=null?fmt(m.custo_total):'—';
+    return'<div class="card" style="padding:10px 12px;margin-bottom:8px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<div>'+
+          '<div style="font-size:11px;color:var(--tx4)">'+ds+(m.motivo?' · '+m.motivo:'')+'</div>'+
+          '<div style="font-size:13px;font-weight:600;color:var(--tx)">'+m.qtd+' un @ '+custoStr+'</div>'+
+          '<div style="font-size:11px;color:var(--r3)">Total: '+totalStr+'</div>'+
+        '</div>'+
+        '<div style="display:flex;gap:6px">'+
+          '<button onclick="editarMovEntrada(\''+m.id+'\')" style="padding:5px 10px;border-radius:8px;background:var(--bg3);border:1px solid var(--bd2);color:var(--tx2);font-size:11px;cursor:pointer">Editar</button>'+
+          '<button onclick="deletarMovEntrada(\''+m.id+'\')" style="padding:5px 10px;border-radius:8px;background:rgba(185,28,28,.15);border:1px solid rgba(185,28,28,.3);color:var(--r3);font-size:11px;cursor:pointer">✕</button>'+
+        '</div>'+
+      '</div>'+
+      '<div id="mov-edit-'+m.id+'" style="display:none;margin-top:10px;border-top:1px solid var(--bd2);padding-top:10px">'+
+        '<div class="fr">'+
+          '<div class="fg"><label>Qtd</label><input type="number" id="mov-eq-'+m.id+'" value="'+m.qtd+'" min="1"></div>'+
+          '<div class="fg"><label>Custo unit. (R$)</label><input type="number" id="mov-ec-'+m.id+'" value="'+(m.custo!=null?m.custo:'')+'" step="0.01" min="0"></div>'+
+        '</div>'+
+        '<button onclick="salvarMovEntrada(\''+m.id+'\')" class="btn btn-p btn-bl" style="margin-top:6px">Salvar</button> '+
+        '<button onclick="cancelarMovEntrada(\''+m.id+'\')" class="btn btn-g btn-bl" style="margin-top:4px">Cancelar</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function editarMovEntrada(movId){
+  document.getElementById('mov-edit-'+movId).style.display='block';
+}
+function cancelarMovEntrada(movId){
+  document.getElementById('mov-edit-'+movId).style.display='none';
+}
+function salvarMovEntrada(movId){
+  var m=movEstoque.find(function(x){return String(x.id)===String(movId);});if(!m)return;
+  var novaQtd=parseInt(document.getElementById('mov-eq-'+movId).value)||0;
+  var novoCusto=parseFloat(document.getElementById('mov-ec-'+movId).value)||0;
+  if(novaQtd<=0){toast('Qtd deve ser maior que zero','err');return;}
+  m.qtd=novaQtd;m.custo=novoCusto;m.custo_total=novoCusto*novaQtd;
+  dbSave('mov_estoque',m);
+  var cache=LS.g('data_'+empresa.id)||{};cache.movEstoque=movEstoque;LS.s('data_'+empresa.id,cache);
+  recalcularCustoMedio(m.produto_id);
+  toast('Entrada atualizada! 📦','ok');
+  renderEntradaProduto(m.produto_id);
+}
+function deletarMovEntrada(movId){
+  if(!confirm('Excluir esta entrada de estoque?'))return;
+  var m=movEstoque.find(function(x){return String(x.id)===String(movId);});if(!m)return;
+  var prodId=m.produto_id;
+  dbDelete('mov_estoque',movId);
+  movEstoque=movEstoque.filter(function(x){return String(x.id)!==String(movId);});
+  var cache=LS.g('data_'+empresa.id)||{};cache.movEstoque=movEstoque;LS.s('data_'+empresa.id,cache);
+  recalcularCustoMedio(prodId);
+  toast('Entrada removida','warn');
+  renderEntradaProduto(prodId);
+}
+function recalcularCustoMedio(prodId){
+  var prod=produtos.find(function(x){return String(x.id)===String(prodId);});if(!prod)return;
+  var ents=movEstoque.filter(function(x){return String(x.produto_id)===String(prodId)&&x.tipo==='entrada'&&x.custo!=null;});
+  if(!ents.length)return;
+  var totalQtd=ents.reduce(function(a,e){return a+(parseInt(e.qtd)||0);},0);
+  var totalCusto=ents.reduce(function(a,e){return a+((parseFloat(e.custo)||0)*(parseInt(e.qtd)||0));},0);
+  prod.custo=totalQtd>0?parseFloat((totalCusto/totalQtd).toFixed(4)):0;
+  prod.custo_total=totalCusto;
+  dbSave('produtos',prod);
+  var epCusto=document.getElementById('ep-custo');
+  if(epCusto)epCusto.value=prod.custo.toFixed(2);
 }
 
 function excluirProd(){
@@ -2784,6 +2868,7 @@ function addProduto(){
     if(fornId)existente.fornecedor_id=fornId;
     if(min>existente.minimo)existente.minimo=min;
     dbSave('produtos',existente);
+    if(qtd>0)logMov('entrada',existente,qtd,'Reposição manual',null,custo);
     if(_prodPago&&custoTotalNovo>0){
       var forn=fornecedores.find(f=>String(f.id)===String(fornId));
       var nd={id:uid(),empresa_id:empresa.id,
@@ -2802,6 +2887,7 @@ function addProduto(){
       fornecedor_id:fornId||null,pago:_prodPago,custo_total:custoTotal,
       data_vencimento:_prodPago?null:venc};
     produtos.push(np);dbSave('produtos',np);
+    if(qtd>0)logMov('entrada',np,qtd,'Entrada inicial',null,custo);
     if(_prodPago&&custoTotal>0){
       var forn=fornecedores.find(f=>String(f.id)===String(fornId));
       var nd={id:uid(),empresa_id:empresa.id,
