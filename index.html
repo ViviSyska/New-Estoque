@@ -1244,10 +1244,11 @@ async function sbRpc(fn, params = {}) {
 // STATE
 // ══════════════════════════════════════
 var me=null, empresa=null;
-var users=[], produtos=[], clientes=[], pedidos=[], historico=[], cupons=[], despesas=[], entradas=[], movEstoque=[], fornecedores=[];
+var users=[], produtos=[], clientes=[], pedidos=[], historico=[], cupons=[], despesas=[], entradas=[], movEstoque=[], fornecedores=[], fechamentos=[];
 var _prodPago=true, _editFornId=null;
 var pendingSync=[];
 var dashPeriod='mes', relPeriod='mes', cxPeriod='mes', histPeriod='mes', entPeriod='mes', despPeriod='mes';
+var _cxTabAtual='res';
 var isOnline=navigator.onLine;
 
 // localStorage cache
@@ -1467,7 +1468,7 @@ async function syncNow(manual){
     });
     historico=his||[];
     movEstoque=mov||[];
-    LS.s('data_'+eid,{users,produtos,clientes,pedidos,historico,cupons,entradas,despesas,movEstoque,fornecedores,ts:Date.now()});
+    LS.s('data_'+eid,{users,produtos,clientes,pedidos,historico,cupons,entradas,despesas,movEstoque,fornecedores,fechamentos,ts:Date.now()});
     isOnline=true;
     setDot('online');
     // atualizar nome da empresa na topbar
@@ -1478,13 +1479,13 @@ async function syncNow(manual){
   }catch(e){
     setDot('offline');
     var cache=LS.g('data_'+eid);
-    if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[];movEstoque=cache.movEstoque||[];fornecedores=cache.fornecedores||[]}
+    if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[];movEstoque=cache.movEstoque||[];fornecedores=cache.fornecedores||[];fechamentos=cache.fechamentos||[];}
     renderAll();
   }
 }
 
 // auto sync every 20s
-setInterval(()=>{if(me&&empresa&&isOnline)syncNow()},180000); // 3 minutos
+setInterval(()=>{if(me&&empresa&&isOnline)syncNow()},60000); // 1 minuto
 
 // ══════════════════════════════════════
 // AUTH
@@ -1596,7 +1597,9 @@ function goTo(sc,el,label){
   document.getElementById('tb-sec').textContent=label||sc;
   var fab=document.getElementById('fab');
   fab.className='fab'+(sc==='pedidos'&&can('criarPed')?' show':'');
-  renderAll();
+  var _fnRender={dash:renderDash,pedidos:renderPedidos,estoque:renderEstoque,caixa:renderCaixa,clientes:renderClientes,cupons:renderCupons,admin:renderAdmin};
+  var fn=_fnRender[sc];if(fn)fn();
+  updBadge();
 }
 
 function showUserMenu(){
@@ -3507,16 +3510,20 @@ function renderCaixa(){
   if(rs)rs.innerHTML='<option value="">Todos</option>'+cupons.map(c=>`<option value="${c.codigo}">${c.codigo}</option>`).join('');
   var rv=document.getElementById('rel-vend');
   if(rv)rv.innerHTML='<option value="">Todos</option>'+users.filter(u=>u.role!=='viewer').map(u=>`<option value="${u.id}">${u.nome}</option>`).join('');
+  if(_cxTabAtual==='hist')renderHistorico();
+  else if(_cxTabAtual==='fech')renderFechamentos();
 }
 
 function cxTab(t,el){
+  _cxTabAtual=t;
   var tabs={res:'cx-res',ent:'cx-ent-tab',desp:'cx-desp-tab',hist:'cx-hist-tab',rel:'cx-rel-tab',fech:'cx-fech-tab'};
   Object.values(tabs).forEach(id=>{var e=document.getElementById(id);if(e)e.style.display='none'});
   var show=document.getElementById(tabs[t]);if(show)show.style.display='block';
   document.querySelectorAll('#sc-caixa .tbb').forEach(b=>b.classList.remove('active'));
   if(el)el.classList.add('active');
   if(t==='hist')renderHistorico();
-  if(t==='fech')renderFechamentos();
+  else if(t==='fech')renderFechamentos();
+  else renderCaixa();
 }
 
 function salvarEntrada(){
@@ -4748,7 +4755,7 @@ var loadTimeout=setTimeout(function(){
       var upn=document.getElementById('upill-name');
       if(upn&&me.nome)upn.textContent=me.nome.split(' ')[0];
       var cache=LS.g('data_'+empresa.id);
-      if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[];movEstoque=cache.movEstoque||[];fornecedores=cache.fornecedores||[]}
+      if(cache){users=cache.users||[];produtos=cache.produtos||[];clientes=cache.clientes||[];pedidos=cache.pedidos||[];historico=cache.historico||[];cupons=cache.cupons||[];entradas=cache.entradas||[];despesas=cache.despesas||[];movEstoque=cache.movEstoque||[];fornecedores=cache.fornecedores||[];fechamentos=cache.fechamentos||[];}
       setupNav();renderAll();
       if(can('dash'))goTo('dash',document.querySelector('.nb'),'Painel');
       else goTo('pedidos',document.querySelectorAll('.nb')[1],'Pedidos');
