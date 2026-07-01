@@ -1720,6 +1720,14 @@ function renderDash(){
   });
   // so pagas (nao pendentes)
   var filtPagas=filtAno.filter(p=>!isTrue(p.pendente)&&isTrue(p.pago));
+  // pedidos ainda abertos (aba Pedidos) mas já pagos — contam no faturamento mesmo sem entrega ainda
+  var pedidosPagosAbertos=(pedidos||[]).filter(p=>{
+    if(!isTrue(p.pago))return false;
+    var ts=p.criado_em;if(!ts)return false;
+    var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||ts);
+    return d>=anoInicio&&d<=anoFim;
+  });
+  filtPagas=filtPagas.concat(pedidosPagosAbertos);
   // pendentes do ano
   var filtPend=filtAno.filter(p=>isTrue(p.pendente)||!isTrue(p.pago));
   // despesas do ano (sem motoboy)
@@ -1752,11 +1760,11 @@ function renderDash(){
   var pendPct=document.getElementById('d-pend-pct');
   if(pendPct)pendPct.textContent=totalGeral>0?fmtN(pctPend)+'% do faturamento':'';
   var byPgto={Pix:0,Dinheiro:0,'Crédito':0,'Débito':0};
-  filtered.forEach(p=>{if(byPgto[p.pgto]!==undefined)byPgto[p.pgto]+=parseFloat(p.total_editado||p.total)||0});
+  filtPagas.forEach(p=>{if(byPgto[p.pgto]!==undefined)byPgto[p.pgto]+=parseFloat(p.total_editado||p.total)||0});
   document.getElementById('d-caixa').innerHTML=Object.entries(byPgto).map(([k,v])=>`<div class="tr"><span class="tr-l">${k}</span><span class="tr-v">${fmt(v)}</span></div>`).join('')+
     `<div class="div"></div><div class="tbox"><span class="tbox-l">Total vendas ${now.getFullYear()}</span><span class="tbox-v">${fmt(fat)}</span></div>`;
   var vendas={};
-  filtered.forEach(p=>{var its=parseItens(p.itens);its.forEach(it=>{vendas[it.nome]=(vendas[it.nome]||0)+(parseInt(it.qtd)||1)})});
+  filtPagas.forEach(p=>{var its=parseItens(p.itens);its.forEach(it=>{vendas[it.nome]=(vendas[it.nome]||0)+(parseInt(it.qtd)||1)})});
   var top=Object.entries(vendas).sort((a,b)=>b[1]-a[1]).slice(0,5);
   document.getElementById('d-top').innerHTML=top.length?top.map(([n,q],i)=>`<div class="tr"><span class="tr-l">${['🥇','🥈','🥉','4.','5.'][i]} ${n}</span><span class="b br">${q} un</span></div>`).join(''):
     '<div style="font-size:12px;color:var(--tx4);text-align:center;padding:8px 0">Nenhuma venda ainda este ano</div>';
