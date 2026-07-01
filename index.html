@@ -1350,6 +1350,8 @@ async function processPendingSync(){
     var op=pending[i];
     try{
       if(op.action==='upsert'){
+        // limpar campos internos que nunca deveriam ir pro banco (proteção contra itens antigos já na fila)
+        if(op.data){delete op.data._local;delete op.data._pending;delete op.data._moveToHistory;delete op.data._estoqueDescontado;delete op.data._motoboyVerificado;}
         // usar UPSERT direto
         await sbFetch(op.table+'?on_conflict=id',{
           method:'POST',
