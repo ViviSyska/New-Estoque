@@ -1874,6 +1874,9 @@ function renderPedidos(){
     var pagoTotal=isTrue(p.pago)&&!isTrue(p.entregue)&&faltando===0;
     var pagoParcial=!isTrue(p.pago)&&faltando>0&&!isTrue(p.entregue);
     var jaFoi=pagoTotal?totalShow:(totalShow-faltando);
+    // detalhamento dos pagamentos (parcial + resto), só mostra se tiver mais de 1
+    var pagtosArr=[];try{pagtosArr=p.pagamentos?JSON.parse(typeof p.pagamentos==='string'?p.pagamentos:'[]'):[]}catch(ex){pagtosArr=[]}
+    var pagtosHtml=pagtosArr.length>1?`<div style="font-size:11px;color:var(--tx3);margin-top:5px;text-align:center">💰 Pago em ${pagtosArr.length}x: ${pagtosArr.map(pg=>fmt(pg.valor)+' '+pg.forma).join(' + ')}</div>`:'';
     return`<div class="card${isPending?' pending-sync':''}${pagoTotal?' pago-aguard':pagoParcial?' pago-parcial':''}">
       ${isPending?'<div class="pending-badge">🔄 Sync pendente</div>':''}
       <div class="card-accent"></div>
@@ -1907,6 +1910,7 @@ function renderPedidos(){
       ${!semEstoque&&pagoTotal?`<div style="font-size:11px;color:#93C5FD;margin-top:6px;text-align:center">💳 Pago — aguardando entrega</div>`:''}
       ${!semEstoque&&pagoParcial?`<div style="font-size:11px;color:#FCD34D;margin-top:6px;text-align:center">◑ Pago ${fmt(jaFoi)} · Falta ${fmt(faltando)} — cobrar ao entregar</div>`:''}
       ${isTrue(p.entregue)&&!isTrue(p.pago)&&!pagoParcial?`<div style="font-size:11px;color:#6EE7B7;margin-top:6px;text-align:center">📦 Entregue — aguardando pagamento</div>`:''}
+      ${pagtosHtml}
       ${can('editPed')?`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
         <button class="btn btn-g btn-sm" onclick="editarPedido('${p.id}')">✏️ Editar</button>
         <button class="btn btn-g btn-sm" onclick="emitirReciboPed('${p.id}')">🧾 Recibo</button>
