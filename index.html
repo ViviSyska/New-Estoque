@@ -1691,8 +1691,9 @@ function renderHistorico(){
   historico.filter(p=>periodFilter(p.finalizado_em||p.criado_em,histPeriod,de,ate)).forEach(p=>{
     todos.push({ts:parseInt(p.finalizado_em||p.criado_em)||0,tipo:'venda',desc:'Venda #'+String(p.id).slice(-6)+(p.cliente_id?(' — '+(clientes.find(c=>String(c.id)===String(p.cliente_id))?.nome||'')):'' ),sub:p.tipo+' · '+(p.pgto||'—'),val:parseFloat(p.total_editado||p.total)||0,positivo:true});
   });
-  // entradas
-  entradas.filter(e=>periodFilter(e.criado_em,histPeriod,de,ate)).forEach(e=>{
+  // entradas — exceto as geradas automaticamente por pagamento de pedido (pedido_id preenchido),
+  // essas já estão embutidas no valor da linha "Venda #ID" acima, mostrar as duas duplicaria o total
+  entradas.filter(e=>periodFilter(e.criado_em,histPeriod,de,ate)&&!e.pedido_id).forEach(e=>{
     todos.push({ts:parseInt(e.criado_em)||0,tipo:'entrada',desc:e.descricao,sub:e.categoria+' · '+e.forma,val:parseFloat(e.valor)||0,positivo:true});
   });
   // despesas
@@ -2692,7 +2693,7 @@ function moverHistorico(p){
   dbSave('historico',hr);
   dbDelete('pedidos',p.id);
   toast('Pedido concluído! 🎉','ok');
-  renderAll();
+  renderAll();syncSoon();
 }
 function excluirPedido(id){
   if(!can('editPed')){toast('Sem permissão','err');return}
