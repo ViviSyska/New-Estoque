@@ -1385,22 +1385,24 @@ function dbSave(table, data){
     LS.s('data_'+empresa.id,cache);
   }
   if(isOnline){
-    sbFetch(table+'?on_conflict=id',{
+    return sbFetch(table+'?on_conflict=id',{
       method:'POST',
       headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
       body:JSON.stringify(empData)
     }).then(r=>{
       console.log('✅ Salvo:',table,empData.id);
+      return r;
     }).catch(e=>{
       console.error('❌ Erro POST:',table,e.message||e);
-      sbFetch(table+'?id=eq.'+empData.id,{
+      return sbFetch(table+'?id=eq.'+empData.id,{
         method:'PATCH',
         body:JSON.stringify(empData)
-      }).then(()=>console.log('✅ PATCH ok:',table))
-      .catch(e2=>{queueSync('upsert',table,empData)});
+      }).then(r2=>{console.log('✅ PATCH ok:',table);return r2})
+      .catch(e2=>{queueSync('upsert',table,empData);throw e2});
     });
   }else{
     queueSync('upsert',table,empData);
+    return Promise.resolve(null);
   }
 }
 
@@ -1490,6 +1492,14 @@ async function syncNow(manual){
 // auto sync every 20s
 setInterval(()=>{if(me&&empresa&&isOnline)syncNow()},60000); // 1 minuto
 
+// re-sincroniza logo depois de ações que disparam efeitos automáticos no banco
+// (trigger de pagamento/estoque cria "entradas" e mexe em produtos.reservado —
+// o cliente não sabe disso sozinho até re-buscar do servidor)
+function syncSoon(){
+  if(!isOnline)return;
+  setTimeout(function(){try{syncNow()}catch(e){console.warn('[syncSoon] falhou:',e)}},900);
+}
+
 // ══════════════════════════════════════
 // AUTH
 // ══════════════════════════════════════
@@ -1549,9 +1559,14 @@ async function doRegister(){
   // criar no supabase auth
   var res=await sbAuth('signup',{email,password:pass,options:{data:{nome,empresa_id:empId}}});
   if(res.error){showErr('rerr',res.error.message||'Erro ao criar conta');return}
-  // criar na tabela usuarios
-  var nu={id:uid(),empresa_id:empId,nome,username:email.split('@')[0],role:'vendedor',comissao:0,super_admin:false,criado_em:Date.now()};
+  var authId=res.user&&res.user.id;
+  if(!authId){showErr('rerr','Erro ao criar conta. Tente novamente.');return}
+  // se a confirmação de email estiver desativada, o signup já retorna uma sessão -> usa pra autenticar o insert
+  if(res.access_token)SB_TOKEN=res.access_token;
+  // criar na tabela usuarios — id TEM que ser o mesmo do Supabase Auth (authId), senão o login nunca encontra o usuário
+  var nu={id:authId,empresa_id:empId,nome,username:email.split('@')[0],role:'vendedor',comissao:0,super_admin:false,criado_em:Date.now()};
   await sbFetch('usuarios',{method:'POST',body:JSON.stringify(nu)}).catch(()=>{});
+  if(!res.access_token)SB_TOKEN=null; // sem sessão de fato ainda (aguardando confirmação de email)
   toast('Conta criada! Verifique seu email antes de entrar.','ok');
   document.querySelector('.ltab').click();
   document.getElementById('li-email').value=email;
@@ -2143,6 +2158,7 @@ function toggleEnt(id){
   p.entregue=true;
   p._estoqueDescontado=true;
   descontarEstoque(p);
+  syncSoon();
 
   if(isTrue(p.pago)){
     // pago total + entregue → finaliza
@@ -2387,7 +2403,7 @@ function atualizarBotoesPgto(){
   if(btnPend&&btnPend.style.display!=='none'){btnPend.style.opacity='1';btnPend.style.cursor='pointer'}
 }
 
-function confirmarPgto(modo){
+async function confirmarPgto(modo){
   var forma=document.getElementById('pgto-forma').value;
   if(window._pgtoFromHist){
     if(!forma){toast('Selecione a forma de pagamento','err');return}
@@ -2447,15 +2463,19 @@ function confirmarPgto(modo){
   }
   var pedData={...p,itens:typeof p.itens==='string'?p.itens:JSON.stringify(p.itens)};
   if(empresa){var cache=LS.g('data_'+empresa.id)||{};if(!cache.pedidos)cache.pedidos=[];var idx=cache.pedidos.findIndex(x=>String(x.id)===String(p.id));if(idx>=0)cache.pedidos[idx]=pedData;LS.s('data_'+empresa.id,cache);}
-  dbSave('pedidos',pedData);
+  try{
+    await dbSave('pedidos',pedData); // espera o pagamento confirmar no banco antes de seguir (evita corrida com o delete do moverHistorico)
+  }catch(e){
+    console.warn('[confirmarPgto] pagamento ficou pendente de sync:',e);
+  }
   closeModal('m-pgto');
   if(p.valor_faltando&&p.valor_faltando>0){
     if(modo==='finalizar'){window._pgtoId=p.id;fecharPendente();}
-    else{toast('◑ Parcial. Falta '+fmt(p.valor_faltando)+' — cobrar ao entregar','warn');renderAll();}
+    else{toast('◑ Parcial. Falta '+fmt(p.valor_faltando)+' — cobrar ao entregar','warn');renderAll();syncSoon();}
     return;
   }
   if(modo==='finalizar'){moverHistorico(p);}
-  else{toast('💳 Pago! Aguardando entrega para finalizar','ok');renderAll();}
+  else{toast('💳 Pago! Aguardando entrega para finalizar','ok');renderAll();syncSoon();}
 }
 
 function verificarEstoque(p){
@@ -2692,7 +2712,7 @@ function excluirPedido(id){
   }
   dbDelete('pedidos',id);
   pedidos=pedidos.filter(x=>String(x.id)!==String(id));
-  toast('Comanda excluída 🗑️','warn');renderAll();
+  toast('Comanda excluída 🗑️','warn');renderAll();syncSoon();
 }
 
 function abrirTransferencia(id){
