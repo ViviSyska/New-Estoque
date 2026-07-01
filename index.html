@@ -1375,7 +1375,7 @@ async function processPendingSync(){
 function dbSave(table, data){
   var empData={...data, empresa_id:empresa?empresa.id:''};
   // remover campos internos que nao existem no banco
-  delete empData._local;delete empData._pending;delete empData._moveToHistory;
+  delete empData._local;delete empData._pending;delete empData._moveToHistory;delete empData._estoqueDescontado;delete empData._motoboyVerificado;
   // salvar no cache local imediatamente
   if(empresa){
     var cache=LS.g('data_'+empresa.id)||{};
@@ -3812,6 +3812,9 @@ function renderClientes(){
   var ate=document.getElementById('cl-ate')?.value;
   // filtrar historico pelo periodo
   var filtHist=historico.filter(p=>periodFilter(p.finalizado_em||p.criado_em,clPeriod,de,ate));
+  // pedidos ainda abertos mas já pagos — contam igual ao Painel/Caixa
+  var pedidosPagosAbertosCl=(pedidos||[]).filter(p=>isTrue(p.pago)&&periodFilter(p.criado_em,clPeriod,de,ate));
+  filtHist=filtHist.concat(pedidosPagosAbertosCl);
   // resumo
   var totPed=filtHist.length;
   var totFat=filtHist.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
@@ -3923,7 +3926,10 @@ function renderClientes(){
 function verHistCliente(cid){
   var cl=clientes.find(c=>String(c.id)===String(cid));
   var nome=cid==='_sem'?'Sem cliente':(cl?cl.nome:'Cliente');
-  var pedsCl=historico.filter(p=>String(p.cliente_id||'_sem')===String(cid));
+  var pedsClHist=historico.filter(p=>String(p.cliente_id||'_sem')===String(cid));
+  // pedidos ainda abertos mas já pagos, do mesmo cliente
+  var pedsClAbertos=(pedidos||[]).filter(p=>String(p.cliente_id||'_sem')===String(cid)&&isTrue(p.pago));
+  var pedsCl=pedsClHist.concat(pedsClAbertos);
   var tot=pedsCl.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
   document.getElementById('m-cl-nome').textContent=nome;
   var info=[];
