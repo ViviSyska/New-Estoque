@@ -1165,14 +1165,12 @@ const SB_HEADERS = {
 
 // 🔥 FETCH PADRÃO (TABELAS)
 async function sbFetch(path, opts = {}) {
-  const MINHA_CHAVE_FORCADA = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1dmxyYmZ2enJzcmN1dnNrbWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NjMyNjUsImV4cCI6MjA5MjEzOTI2NX0.ZiXsiB2Ke4TtZMuI34R7_6Yq3MjIDVHrNepH-X9F5Io';
-
   try {
     const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
       method: opts.method || 'GET',
       headers: {
-        'apikey': MINHA_CHAVE_FORCADA,
-        'Authorization': 'Bearer ' + MINHA_CHAVE_FORCADA,
+        'apikey': SB_KEY,
+        'Authorization': 'Bearer ' + (SB_TOKEN || SB_KEY), // usa o token do usuário logado (RLS); cai pra anon key se não houver sessão
         'Content-Type': 'application/json',
         'Prefer': 'return=representation',
         ...(opts.headers||{})
@@ -1221,7 +1219,11 @@ async function sbRpc(fn, params = {}) {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
       method: 'POST',
-      headers: SB_HEADERS,
+      headers: {
+        apikey: SB_KEY,
+        Authorization: 'Bearer ' + (SB_TOKEN || SB_KEY),
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify(params)
     });
 
@@ -1244,6 +1246,7 @@ async function sbRpc(fn, params = {}) {
 // STATE
 // ══════════════════════════════════════
 var me=null, empresa=null;
+var SB_TOKEN=null; // token do usuário logado - usado para autenticar requisições (RLS)
 var users=[], produtos=[], clientes=[], pedidos=[], historico=[], cupons=[], despesas=[], entradas=[], movEstoque=[], fornecedores=[], fechamentos=[];
 var _prodPago=true, _editFornId=null;
 var pendingSync=[];
@@ -1525,6 +1528,7 @@ async function doLogin(){
     empresa=empData&&empData[0]||null;
     if(!empresa){showErr('lerr','Empresa não encontrada. Contate o administrador.');return}
     LS.s('session',{me,empresa,token:res.access_token});
+    SB_TOKEN=res.access_token;
     afterLogin();
   }catch(e){showErr('lerr','Erro ao carregar dados. Verifique sua conexão.')}
 }
@@ -1562,7 +1566,7 @@ async function doForgotPass(){
 
 function doLogout(){
   LS.s('session',null);
-  me=null;empresa=null;
+  me=null;empresa=null;SB_TOKEN=null;
   closeModal('m-user');
   document.getElementById('lscr').classList.remove('hidden');
 }
@@ -4750,6 +4754,7 @@ var loadTimeout=setTimeout(function(){
     if(session&&session.me&&session.empresa){
       console.log('[init] sessao encontrada');
       me=session.me;empresa=session.empresa;
+      SB_TOKEN=session.token;
       clearTimeout(loadTimeout);
       document.getElementById('ldscr').classList.add('hidden');
       var upn=document.getElementById('upill-name');
