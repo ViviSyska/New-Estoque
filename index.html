@@ -1517,20 +1517,20 @@ async function doLogin(){
   _loginTentativas=0;
   var authId=res.user&&res.user.id;
   if(!authId){showErr('lerr','Erro de autenticação. Tente novamente.');return}
+  SB_TOKEN=res.access_token; // precisa estar setado ANTES de buscar usuarios/empresas (RLS exige auth.uid())
   try{
     var userData=await sbFetch('usuarios?id=eq.'+authId+'&select=*');
     if(!userData||!userData.length){
       userData=await sbFetch('usuarios?username=eq.'+encodeURIComponent(email)+'&select=*');
     }
-    if(!userData||!userData.length){showErr('lerr','Usuário não encontrado. Contate o administrador.');return}
+    if(!userData||!userData.length){showErr('lerr','Usuário não encontrado. Contate o administrador.');SB_TOKEN=null;return}
     me=userData[0];
     var empData=await sbFetch('empresas?id=eq.'+me.empresa_id+'&select=*');
     empresa=empData&&empData[0]||null;
-    if(!empresa){showErr('lerr','Empresa não encontrada. Contate o administrador.');return}
+    if(!empresa){showErr('lerr','Empresa não encontrada. Contate o administrador.');SB_TOKEN=null;return}
     LS.s('session',{me,empresa,token:res.access_token});
-    SB_TOKEN=res.access_token;
     afterLogin();
-  }catch(e){showErr('lerr','Erro ao carregar dados. Verifique sua conexão.')}
+  }catch(e){showErr('lerr','Erro ao carregar dados. Verifique sua conexão.');SB_TOKEN=null}
 }
 
 async function doRegister(){
