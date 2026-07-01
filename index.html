@@ -1933,10 +1933,10 @@ function addItemPed(){
   else{_pedItems.push({prodId:prod.id,nome:prod.nome,qtd,precoUnit:prod.preco,precoFinal:pf,total:pf*qtd});}
   document.getElementById('ped-preco-unit').value='';
   document.getElementById('ped-qtd').value=1;
-  // avisar se estoque baixo
-  var qtdDisp=parseInt(prod.qtd)||0;
-  if(qtdDisp===0){toast('⚠️ '+prod.nome+' sem estoque! Atualize antes de entregar.','warn')}
-  else if(qtdDisp<qtd){toast('⚠️ Estoque insuficiente de '+prod.nome+'! Tem: '+qtdDisp+' un.','warn')}
+  // avisar se estoque baixo (considerando o que já está reservado por outros pedidos pagos)
+  var qtdDisp=(parseInt(prod.qtd)||0)-(parseInt(prod.reservado)||0);
+  if(qtdDisp<=0){toast('⚠️ '+prod.nome+' sem estoque disponível! ('+(parseInt(prod.reservado)||0)+' un. reservada(s) em outros pedidos)','warn')}
+  else if(qtdDisp<qtd){toast('⚠️ Estoque insuficiente de '+prod.nome+'! Disponível: '+qtdDisp+' un. (parte já reservada em outros pedidos)','warn')}
   renderPedItems();
 }
 
@@ -2456,10 +2456,15 @@ function verificarEstoque(p){
   its.forEach(it=>{
     var prod=produtos.find(x=>String(x.id)===String(it.prodId));
     if(prod){
-      var qtdDisp=parseInt(prod.qtd)||0;
       var qtdNec=parseInt(it.qtd)||1;
+      // reservado por TODOS os pedidos pagos (incluindo este, se ele mesmo já estiver pago)
+      var reservadoTotal=parseInt(prod.reservado)||0;
+      // se este pedido já está pago, a reserva dele mesmo já está contada em reservadoTotal — soma de volta,
+      // já que essas unidades são dele, não de "outro" pedido concorrendo pelo mesmo estoque
+      var minhaReserva=isTrue(p.pago)?qtdNec:0;
+      var qtdDisp=(parseInt(prod.qtd)||0)-reservadoTotal+minhaReserva;
       if(qtdDisp<qtdNec){
-        falta.push({nome:it.nome,precisa:qtdNec,tem:qtdDisp});
+        falta.push({nome:it.nome,precisa:qtdNec,tem:Math.max(0,qtdDisp)});
       }
     }
   });
@@ -2711,6 +2716,8 @@ function renderEstoque(){
     var lucro=(parseFloat(p.preco)||0)-(parseFloat(p.custo)||0);
     var pct=parseInt(p.minimo)>0?Math.min(100,Math.round((parseInt(p.qtd)||0)/(parseInt(p.minimo)||1)*100)):100;
     var low=(parseInt(p.qtd)||0)<=(parseInt(p.minimo)||0);
+    var reserv=parseInt(p.reservado)||0;
+    var disp=Math.max(0,(parseInt(p.qtd)||0)-reserv);
     return`<div class="card" onclick="${can('editProd')?'editProduto(\''+p.id+'\')':''}" style="${can('editProd')?'cursor:pointer':''}">
       <div class="card-accent"></div>
       <div class="ch">
@@ -2718,6 +2725,7 @@ function renderEstoque(){
         <div style="text-align:right">
           <div style="font-size:18px;font-weight:700;font-family:var(--mo)">${fmt(p.preco)}</div>
           <span class="b ${low?'ba':'bg'}" style="display:inline-block;margin-top:3px">${p.qtd} un</span>
+          ${reserv>0?`<div style="font-size:10px;color:var(--tx4);margin-top:3px">🔒 ${reserv} reservada(s) · ${disp} disp.</div>`:''}
         </div>
       </div>
       <div class="pgbar"><div class="pgfill" style="width:${pct}%;background:${low?'var(--a)':'var(--g)'}"></div></div>
