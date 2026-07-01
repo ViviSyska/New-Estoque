@@ -1743,15 +1743,23 @@ function renderDash(){
     return d>=anoInicio&&d<=anoFim;
   });
   filtPagas=filtPagas.concat(pedidosPagosAbertos);
-  // pendentes do ano
+  // pendentes do ano (historico) + pedidos ainda abertos com pagamento parcial (falta receber o resto)
   var filtPend=filtAno.filter(p=>isTrue(p.pendente)||!isTrue(p.pago));
+  var pedidosParciaisAbertos=(pedidos||[]).filter(p=>{
+    if(isTrue(p.pago))return false;
+    if(!(parseFloat(p.valor_faltando)>0))return false;
+    var ts=p.criado_em;if(!ts)return false;
+    var d=typeof ts==='string'&&ts.includes('T')?new Date(ts):new Date(parseInt(ts)||ts);
+    return d>=anoInicio&&d<=anoFim;
+  });
   // despesas do ano (sem motoboy)
   var filtDesp=despesas.filter(d=>{
     var dt=typeof d.criado_em==='string'&&d.criado_em.includes('T')?new Date(d.criado_em):new Date(parseInt(d.criado_em)||d.criado_em);
     return dt>=anoInicio&&dt<=anoFim&&!d._motoboy;
   });
   var fat=filtPagas.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
-  var pend=filtPend.reduce((a,p)=>a+(parseFloat(p.valor_faltando||p.total_editado||p.total)||0),0);
+  var pend=filtPend.reduce((a,p)=>a+(parseFloat(p.valor_faltando||p.total_editado||p.total)||0),0)
+    + pedidosParciaisAbertos.reduce((a,p)=>a+(parseFloat(p.valor_faltando)||0),0);
   var desp=filtDesp.reduce((a,d)=>a+(parseFloat(d.valor)||0),0);
   var saldo=fat-desp;
   var tick=filtPagas.length?fat/filtPagas.length:0;
@@ -3493,8 +3501,14 @@ function setRelPeriod(p,el){
 
 function renderCaixa(){
   if(!can('verCaixa'))return;
-  var filtHist=historico.filter(p=>periodFilter(p.finalizado_em||p.criado_em,cxPeriod));
-  var filtEnt=entradas.filter(e=>periodFilter(e.criado_em,cxPeriod));
+  // só pedidos PAGOS (fiado/pendente fica de fora — aparece só em "Pendentes", igual ao Painel)
+  var filtHist=historico.filter(p=>periodFilter(p.finalizado_em||p.criado_em,cxPeriod)&&isTrue(p.pago)&&!isTrue(p.pendente));
+  // pedidos ainda abertos na aba Pedidos, mas já pagos — contam igual ao Painel
+  var pedidosPagosAbertosCx=(pedidos||[]).filter(p=>isTrue(p.pago)&&periodFilter(p.criado_em,cxPeriod));
+  filtHist=filtHist.concat(pedidosPagosAbertosCx);
+  // entradas: exclui as geradas automaticamente por pagamento de pedido (pedido_id preenchido) —
+  // esse valor já está contado acima via pedidosPagosAbertosCx, senão duplicaria
+  var filtEnt=entradas.filter(e=>periodFilter(e.criado_em,cxPeriod)&&!e.pedido_id);
   var filtDesp=despesas.filter(d=>periodFilter(d.criado_em,cxPeriod));
   var fatV=filtHist.reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
   var fatE=filtEnt.reduce((a,e)=>a+(parseFloat(e.valor)||0),0);
@@ -3502,7 +3516,8 @@ function renderCaixa(){
   var bruto=fatV;var liquido=fatV+fatE-fatD;
   var el_b=document.getElementById('cx-bruto');if(el_b)el_b.textContent=fmtN(bruto);
   var el_l=document.getElementById('cx-liq');if(el_l)el_l.textContent=fmtN(liquido);
-  var fatPend=historico.filter(p=>p.pendente==true||p.pendente==='true').reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0);
+  var fatPend=historico.filter(p=>p.pendente==true||p.pendente==='true').reduce((a,p)=>a+(parseFloat(p.total_editado||p.total)||0),0)
+    + (pedidos||[]).filter(p=>!isTrue(p.pago)&&parseFloat(p.valor_faltando)>0).reduce((a,p)=>a+(parseFloat(p.valor_faltando)||0),0);
   document.getElementById('cx-ent-v').textContent=fmtN(fatPend);
   document.getElementById('cx-desp-v').textContent=fmtN(fatD);
   document.getElementById('cx-saldo').textContent=fmt(liquido);
