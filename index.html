@@ -410,14 +410,14 @@ body{font-family:var(--fn);font-size:14px;color:var(--tx);overscroll-behavior:no
       <div class="tabbar">
         <button class="tbb active" onclick="eTab('list',this)">Produtos</button>
         <button class="tbb" onclick="eTab('add',this)" id="tab-add-prod">Adicionar</button>
-        <button class="tbb" onclick="eTab('forn',this)">🏪 Fornecedores</button>
-        <button class="tbb" onclick="eTab('mov',this)">📋 Histórico</button>
+        <button class="tbb" onclick="eTab('forn',this)">Fornecedores</button>
+        <button class="tbb" onclick="eTab('mov',this)">Histórico</button>
       </div>
       <div id="est-list"><div id="prod-list"></div></div>
       <div id="est-forn" style="display:none">
         <button class="btn btn-p btn-bl" style="margin-bottom:12px" onclick="openModal('m-forn-novo')">+ Novo fornecedor</button>
         <div id="forn-list"></div>
-        <div id="forn-empty" class="empty" style="display:none"><div class="ei">🏪</div><div class="et">Sem fornecedores</div><div class="es">Cadastre fornecedores para vincular aos produtos</div></div>
+        <div id="forn-empty" class="empty" style="display:none"><div class="ei"></div><div class="et">Sem fornecedores</div><div class="es">Cadastre fornecedores para vincular aos produtos</div></div>
       </div>
       <div id="est-add" style="display:none">
         <div class="card"><div class="card-accent"></div>
